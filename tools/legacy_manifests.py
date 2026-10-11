@@ -10,8 +10,8 @@ Other regions' old builds (e.g. Traditional Chinese com.tw.danmemo 5.x) use <CDN
 production-<region>/…; those go to cdn/legacy_<region>/ and are kept apart from the JP set.
 
 Usage: python tools/legacy_manifests.py some_old.apk [more.apk/.xapk ...]
-Writes cdn/legacy/<app version>/png.project.manifest.N for JP builds (read by fill_gaps.py),
-cdn/legacy_<region>/<app version>/ for others.
+Writes <legacy_manifests>/<app version>/png.project.manifest.N for JP builds (config.json, default
+cdn/legacy; read by fill_gaps.py), <legacy_manifests>_<region>/<app version>/ for others.
 """
 import io
 import json
@@ -22,8 +22,10 @@ import urllib.error
 import urllib.request
 import zipfile
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "cdn", "legacy")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config
+
+OUT = config.load()["legacy_manifests"]  # default cdn/legacy
 
 
 def bundled_manifest(path):

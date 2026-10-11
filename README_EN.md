@@ -9,12 +9,12 @@ Relive the stories of *DanMachi: Memoria Freese* (ダンメモ) in a desktop or 
 ## Features
 
 - **Story** – full index of the main story, events and character stories. Reruns with the same content are merged; episodes already in the album link to it. Events show their original run dates, some with banners.
-- **Album** – the memorial app's "Anniversary / Event Story" album: the 48 original events it selected, with banners and run dates. With global data the same selection is applied to the global titles, banners and scripts.
-- **Character Stories** – costume stories, character quests and interaction stories per character.
+- **Album** – the memorial app's "Anniversary / Event Story" album: the 48 original events it selected, with banners and run dates (with global data the same selection is applied to the global titles, banners and scripts), plus tabs for the events it leaves out that have a run period: other events, descent events, and reruns whose content differs from the first run.
+- **Character Stories** – costume stories, character quests and interaction stories per character, plus a profile and the character's voice lines (login, greetings, touch, talk, town, alarm, costume change, system; about 8,300–8,600).
 - **Portraits** – portrait and expression viewer.
 - **Cards** – card stats and the gacha reveal (with global data it uses the game's official English name plates; for JP data about 342 official plates can be recovered through an old APK's manifest, fetched by `tools/fill_gaps.py`, and the rest are drawn in the rarity's colours; the gacha line is a vertical-text image, also fetched by `fill_gaps.py`: ~690 cards with global data, ~281 with JP data).
 - **Movies** – the cutscene movies the stories play (e.g. the seven 6th-anniversary SO12 movies), watchable on their own, each linked to its episode.
-- **Others** – story fragments that are not in the index.
+- **Others** – story fragments that are not in the index. Start-up previews / home-screen stories tied to an event appear at the top of that event; the rest are listed by date.
 - Player: AUTO, SKIP (hold left Ctrl, or toggle), LOG (replay voices), Hide (hide the text box for screenshots: H key or right-click), Settings (text-box colour/opacity, skip delay), continuous playback across a chapter, read marks.
 - Interface in English, Japanese or Chinese (picker at the top right; defaults to your browser's language). Story text stays in the language of the data you built from.
 
@@ -22,10 +22,11 @@ Relive the stories of *DanMachi: Memoria Freese* (ダンメモ) in a desktop or 
 
 | | Setup A: Japanese memorial app | Setup B: global app-data backup |
 |---|---|---|
-| Story text | Japanese | **English** (official translation) |
+| Story text | Japanese | **English** (official translation; ~2,700 scripts the global server never translated stay in Japanese) |
 | Voices | Japanese | Japanese |
 | Data you need | the JP memorial app `com.danmemo` (free) + assets from the CDN or a backup | a backup of the global app's data folder (`contents/1` … `contents/8`, …) **plus** `libapp.so` from the JP memorial app, for the keys |
-| Album | 48 entries | 39 entries (the backup lacks the scripts of the 9 latest events) |
+| Album | 48 entries | 48 entries |
+| Cards / gacha reveal | 790 cards; art, reveal and gacha voices only for cards up to Sept. 2019, and only with an old 8.x APK (see below) | 784 cards, all with art, official name plates; lines for 693 |
 
 Both use the same tools; only `config.json` differs.
 
@@ -76,15 +77,15 @@ A backup of the global app's data folder looks like this (this is the layout of 
 dump/
   contents/1/files/…                       assets
   contents/1/master/divide_enc/*.enc        master tables (431)
-  contents/1/master/divide_novel_command_enc/*.enc   story scripts (5,500, English)
+  contents/1/master/divide_novel_command_enc/*.enc   story scripts (11,462)
   contents/1/manifests/…, project.manifest
   contents/2 … contents/8/files/…           more assets
-  voice_root/files/sound/voice_episode/…    event voices (already unpacked)
-  single_image_root/files/ui/single_image/… story backgrounds and CGs
-  area_atlas_root/…                         quest maps (not needed)
+  contents/voice_root/files/sound/voice_episode/…    event voices (already unpacked; 319 of 401 episodes)
+  contents/single_image_root/files/ui/single_image/… story backgrounds and CGs
+  contents/area_atlas_root/…, contents/cache/        quest maps, image cache (not needed)
 ```
 
-If yours came as `contents.part1.rar` … `part6.rar`, extract them first (`unrar x contents.part1.rar`).
+If yours came as `contents.part1.rar` … `part6.rar` (about 12 GB), extract them into `dump/` first (`mkdir dump && cd dump && unrar x ../contents.part1.rar`).
 
 ### 2. config.json
 
@@ -94,14 +95,15 @@ If yours came as `contents.part1.rar` … `part6.rar`, extract them first (`unra
   "novel_dirs":  ["dump/contents/1/master/divide_novel_command_enc"],
   "master_dirs": ["dump/contents/1/master/divide_enc"],
   "asset_roots": [
+    "assets",
     "dump/contents/1", "dump/contents/2", "dump/contents/3", "dump/contents/4",
     "dump/contents/5", "dump/contents/6", "dump/contents/7", "dump/contents/8",
-    "dump/voice_root", "dump/single_image_root"
+    "dump/contents/voice_root", "dump/contents/single_image_root"
   ]
 }
 ```
 
-Paths are relative to the project root. Earlier asset roots win when a file exists in several of them.
+Paths are relative to the project root. Earlier asset roots win when a file exists in several of them. `assets` is where `tools/fill_gaps.py` puts what it downloads (step 5).
 To keep several setups side by side, put each in its own file and select it with `DANMEMO_CONFIG=path/to/config.json` (every tool honours it; you can also set `"dec"` and `"web"` output folders per config).
 
 ### 3. Movies
@@ -112,31 +114,33 @@ Cutscenes are CRI USM files; convert them once:
 for f in dump/contents/*/files/movie/*.usm; do ./venv/bin/python tools/usm.py "$f" "${f%.usm}.mp4"; done
 ```
 
-### 4. Decrypt, build, serve
+### 4. Decrypt and build
 
 ```bash
 ./venv/bin/python tools/decrypt_all.py
 ./venv/bin/python tools/build_web.py
-./venv/bin/python tools/serve.py          # open http://localhost:8080/
 ```
 
-Optional – fetch what the backup is missing (including the official gacha name plates, which the community dumps don't contain). `tools/fill_gaps.py` reads the manifests inside your backup and skips everything any configured asset root already has, downloading only the rest into `assets/` (add `"assets"` as the first entry of `asset_roots`). If you also run `tools/fetch_manifests.py` (it uses the JP `libapp.so` from `config.json`), it can fill some gaps from the Japanese memorial app's file list as well. Then run `tools/build_web.py` again.
+### 5. Fetch what the backup is missing (recommended)
+
+The backup lacks the voices of 82 events and a few other files. `tools/fill_gaps.py` reads the manifests inside your backup, skips everything any configured asset root already has, downloads only the rest into `assets/` (about 1.6 GB, md5-checked) and unpacks the event-voice zips. It only uses your backup's own manifests, so everything stays in the global version. Then build again and start the server:
 
 ```bash
 ./venv/bin/python tools/fill_gaps.py --dry   # list what it would download
 ./venv/bin/python tools/fill_gaps.py
+./venv/bin/python tools/build_web.py
+./venv/bin/python tools/serve.py          # open http://localhost:8080/
 ```
+
+Each setup uses only the manifests its `config.json` lists (`manifests`, `legacy_manifests`, plus the ones inside its asset roots). Filling gaps from another region's files is opt-in: list that region's manifests under `fallback_manifests` — their images may then carry that region's language.
 
 `tools/serve.py 8080 0.0.0.0` makes it reachable from other devices on your network.
 
 ### What to expect
 
-We verified this path with the EU dump's layout and data, with no Japanese files configured: 5,931 files decrypt with 0 errors; 5,500 English scripts (5,261 in the story index), 39 album entries, 26 character pages and 784 cards build; 40 randomly picked stories played through without errors, with English text and Japanese voices.
+Verified from scratch (2026-10) with the community EU dump (`contents.part1–6.rar`), the code from this repository and nothing else: 11,893 files decrypt with 0 errors; 11,462 scripts (8,661 in English, about 2,700 never translated and still in Japanese), 5,521 of them in the story index; album 48 entries; 26 character pages; 784 cards, all with art and official name plates, gacha lines for 693; 7 6th-anniversary movies. After step 5, 10,877 scripts have every asset they reference. 40 randomly picked stories played through without errors.
 
-Known gaps and limitations:
-
-- **Album: 39 of 48 entries**. The album is the memorial app's selection of original events; the tools apply the same selection to the global data, but the backup has no scripts for the 9 latest ones (Orgion Saga I–III, Valhalla Panic, Overture of the Sword and Spear, Knossos War, Memoria Freese, A Twilight Dream, the S4 Calamity Arc side stories).
-- **Some missing images**: about 2,175 image references in the English scripts point to files the global backup doesn't contain, and roughly 1,000 references (voices, images, sound effects) are missing from every known source. The player skips them.
+Known gaps: about 850 voice lines, 150 images and 20 sound effects that the scripts reference exist in no source we know of. The player skips them.
 
 ## Setup A: Japanese memorial app
 
@@ -154,10 +158,23 @@ Known gaps and limitations:
    ```bash
    ./venv/bin/python tools/decrypt_all.py
    ./venv/bin/python tools/build_web.py
-   ./venv/bin/python tools/legacy_manifests.py old.apk   # optional: with a JP APK of 8.x or older, fetch that build's online manifest (JP banners, name plates, …)
-   ./venv/bin/python tools/fill_gaps.py   # optional: fetch assets the stories use but the memorial manifests omit; then run build_web.py again
+   ./venv/bin/python tools/legacy_manifests.py old.apk   # recommended: a JP APK of 8.x or older (2019) — see below
+   ./venv/bin/python tools/fill_gaps.py
+   ./venv/bin/python tools/build_web.py
    ./venv/bin/python tools/serve.py
    ```
+
+The memorial app has no gacha, and its manifests omit many files the stories use. Everything Japanese beyond it comes from an old online build: `tools/legacy_manifests.py` reads the manifest URL an 8.x APK carries (those manifests are still served), and `tools/fill_gaps.py` then fetches card art, the gacha reveal and its voices, Japanese name plates and lines, event banners and story assets from it. Verified from scratch (2026-10):
+
+| | memorial app only | + 8.2.0 APK |
+|---|---|---|
+| Scripts with every asset they reference | 4,480 of 11,462 | 10,531 |
+| Story-index banners | 0 | 160 |
+| Cards with art / gacha voice | 8 / 42 | 297 / 281 |
+| Official name plates / gacha lines | 108 / 75 (from an early 2017 snapshot) | 342 / 281 |
+| Gacha reveal (cuts, opening movies) | no | yes |
+
+Later cards and events exist only in the global data; mixing them in is opt-in (`fallback_manifests` in `config.json`) and brings their English text along.
 
 Optionally, add the global backup's scripts as a translation source in `config.json` (`"translations": {"en": {"novel_dirs": [...], "master_dirs": [...]}}`) and run `tools/decrypt_all.py --lang en` (→ `dec_en/`).
 
@@ -183,11 +200,10 @@ tools/build_web.py       build web/data/ (story index, album, per-story JSON, ga
 tools/fetch_manifests.py fetch the CDN asset manifests
 tools/download.py        download assets from the CDN (resumable, md5-checked)
 tools/legacy_manifests.py read the remote manifest URL from an old (pre-2020, pre-md5 CDN) JP APK → cdn/legacy/, so fill_gaps.py can fetch Japanese originals
-tools/fill_gaps.py       fetch assets the stories use but the memorial manifests omit
+tools/fill_gaps.py       fetch assets the stories use but no asset root has, from this setup's own manifests (another region's only if listed under fallback_manifests)
 tools/config.py          loads config.json (or the file named by DANMEMO_CONFIG)
 tools/cardstat.py        card stat calculator (reverse-engineered from the memorial app's character screen)
 tools/download_extra.py  download extra assets listed in a manifest-style JSON
-tools/gacha_voice_alias.json  gacha voices that reuse story voice files (file names only)
 tools/usm.py             CRI USM → MP4
 tools/gachanames.py      gacha name plates (called by build_web.py)
 tools/serve.py           local server with HTTP Range support

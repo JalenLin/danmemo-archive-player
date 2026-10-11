@@ -39,6 +39,7 @@ async function route() {
     if (parts[0] === 'chars') return renderChars(view, getJSON, parts[1]);
     if (parts[0] === 'gacha') return renderGacha(view, getJSON, parts[1]);
     if (parts[0] === 'movies') return movies();
+    if (parts[0] === 'notices') return notices(parts[1]);
     if (parts[0] === 'credits') {
       view.innerHTML = `<div class="crumbs"><a href="#/">${t('ホーム')}</a></div><h1>${t('エンドクレジット')}</h1>
         <video controls style="width:100%;max-height:75vh;background:#000;border-radius:10px" src="${(await getJSON('data/index.json')).ui?.credits || ''}"></video>`;
@@ -162,7 +163,7 @@ async function adventure(ci, ai) {
       return `<details class="episode" ${a.episodes.length <= 3 ? 'open' : ''}>
         <summary>${e.banner ? `<img class="ep-banner" src="${e.banner}" alt="" loading="lazy">` : ''}<span class="tx"><span class="t">${esc(e.title)}</span><span class="s">${esc(e.sub)}</span>${e.reruns ? `<span class="tag" title="${t('同じ内容の復刻をまとめました')}">${t('復刻あり')}</span>` : ''}${period(e.start, e.end) ? `<span class="pd">${period(e.start, e.end)}</span>` : ''}</span>
           <a class="play-all" href="#/play/${encodeURIComponent(first)}?${ctx}">${t('▶ この話を再生')}</a></summary>
-        <div class="stages">${e.stages.map((s, si) => `
+        <div class="stages">${noticeLinks(e.notices)}${e.stages.map((s, si) => `
           <div class="stage-row"><span class="n">${si + 1}</span>
             <a href="#/play/${encodeURIComponent(s.novels[0])}?${ctx}">${esc(s.title || idx.titles[s.novels[0]] || s.novels[0])}</a>
             <span class="parts">${s.novels.length > 1 ? s.novels.map((k, ki) => `<a class="${readSet.has(k) ? 'read' : ''}" href="#/play/${encodeURIComponent(k)}?${ctx}" title="${esc(idx.titles[k] || k)}">${ki + 1}</a>`).join('') : (readSet.has(s.novels[0]) ? '<span class="muted">既読</span>' : '')}</span>
@@ -172,8 +173,12 @@ async function adventure(ci, ai) {
   void list;
 }
 
+// preview / home-base novels the game played at start-up around an event (data: ep.notices)
+const noticeLinks = (ns, ctx) => (ns?.length ? `<div class="notices"><span class="muted">${t('予告・拠点ノベル')}</span>${ns.map((n) =>
+  `<a class="${readSet.has(n.key) ? 'read' : ''}" href="#/play/${encodeURIComponent(n.key)}${ctx ? `?${ctx}` : ''}">${esc(n.title)}</a>`).join('')}</div>` : '');
+
 // ------------------------------------------------------------------ アルバム (the offline app's album)
-const ALBUM = { anniversary: '周年ストーリー', event: 'イベントストーリー' };
+const ALBUM = { anniversary: '周年ストーリー', event: 'イベントストーリー', extra: 'その他のイベント', advent: '降臨イベント', rerun: '復刻イベント' };
 // run dates: period() in i18n.js (the app's wording, message home_quest_event_open_period, in Japanese)
 const albumNovels = (x) => x.stages.flatMap((s) => s.novels);
 // the album exists only in the JP offline app's data; builds from other app data have none
@@ -185,7 +190,9 @@ async function albumList(sec) {
   if (!ALBUM[sec]) sec = 'anniversary';
   view.innerHTML = `<h1>${t('アルバム')}</h1>
     <div class="tabs">${Object.entries(ALBUM).map(([k, n]) => `<a class="${k === sec ? 'on' : ''}" href="#/album/${k}">${t(n)}</a>`).join('')}</div>
-    <div class="album">${al[sec].map((x, i) => {
+    ${sec === 'extra' || sec === 'advent' ? `<p class="muted">${t('メモリアルアプリのアルバムに収録されていない、開催期間のあるイベント（新しい順）。')}</p>`
+      : sec === 'rerun' ? `<p class="muted">${t('内容が初回と異なる復刻イベント（新しい順）。')}</p>` : ''}
+    <div class="album">${(al[sec] || []).map((x, i) => {
       const ns = albumNovels(x), r = ns.filter((k) => readSet.has(k)).length, p = period(x.start, x.end);
       return `<a class="banner ${r === ns.length ? 'read' : ''}" href="#/album/${sec}/${i}" title="${esc(x.title)}">
         ${x.banner ? `<img src="${x.banner}" alt="${esc(x.title)}" loading="lazy">` : `<span class="nob">${esc(x.title)}</span>`}
@@ -204,7 +211,7 @@ async function albumEpisode(sec, i) {
       <div><h1>${esc(x.title)}</h1>${p ? `<div class="muted">${p}</div>` : ''}
         <div class="album-tools"><a class="play-all" href="#/play/${encodeURIComponent(x.stages[0].novels[0])}?${ctx}">${t('▶ 最初から再生')}</a>
           <label><input type="checkbox" data-cont ${store.get('dm.albumCont', true) ? 'checked' : ''}> ${t('ストーリー連続再生')}</label></div></div></div>
-    <div class="stages flat">${x.stages.map((s, si) => `
+    ${noticeLinks(x.notices)}<div class="stages flat">${x.stages.map((s, si) => `
       <div class="stage-row"><span class="n">STORY ${si + 1}</span>
         <a href="#/play/${encodeURIComponent(s.novels[0])}?${ctx}">${esc(s.title || idx.titles[s.novels[0]] || s.novels[0])}</a>
         <span class="parts">${s.novels.length > 1 ? s.novels.map((k, ki) => `<a class="${readSet.has(k) ? 'read' : ''}" href="#/play/${encodeURIComponent(k)}?${ctx}" title="${esc(idx.titles[k] || k)}">${ki + 1}</a>`).join('') : (readSet.has(s.novels[0]) ? '<span class="muted">既読</span>' : '')}</span>
@@ -216,13 +223,15 @@ async function albumEpisode(sec, i) {
 async function roleList() {
   const cs = await getJSON('data/characters.json');
   view.innerHTML = `<h1>${t('キャラストーリー')}</h1>
-    <p class="muted">${t('キャラクターごとの衣装エピソード・キャラクエスト・ふれあい。')}</p>
+    <p class="muted">${t('キャラクターごとの衣装エピソード・キャラクエスト・ふれあい・ボイス。')}</p>
     <input class="search" placeholder="${t('キャラ名で検索…')}">
     <div class="thumbs role-grid">${cs.map((c) => {
       const parts = [];
       if (c.costumes.length) parts.push(t('衣装 {n}', { n: c.costumes.length }));
       if (c.quest) parts.push(t('キャラクエ'));
       if (c.fureai) parts.push(t('ふれあい'));
+      if (c.present?.length) parts.push(t('バレンタイン'));
+      if (c.voices) parts.push(t('ボイス {n}', { n: c.voices }));
       return `<a class="thumb" data-q="${esc(c.name + ' ' + c.short + ' ' + c.code)}" href="#/role/${encodeURIComponent(c.code)}">
         <div class="im"${c.img ? ` style="background-image:url(${c.img});background-size:cover;background-position:center 15%"` : ''}></div>
         <div class="cap"><b>${esc(c.short)}</b><br>${parts.join(' ・ ')}</div></a>`;
@@ -261,22 +270,72 @@ async function roleDetail(code) {
         <div class="im"${co.thumb ? ` style="background-image:url(${co.thumb});background-size:cover;background-position:center 20%"` : ''}></div>
         <div class="cap"><b>${esc(co.title)}</b><br>★${co.rarity} ・ ${t('{r}/{n} 既読', { r, n: ns.length })}</div></a>`;
     }).join('')}</div>` : '';
+  const p = c.profile || {};
+  const prof = [p.title && `<b>${esc(p.title)}</b>`, p.race, p.age && t('{n}歳', { n: p.age }), p.height && `${esc(p.height)}`, p.cv && `CV: ${esc(p.cv)}`].filter(Boolean);
   view.innerHTML = `<div class="crumbs"><a href="#/role">${t('キャラストーリー')}</a></div>
     <div class="role-head"><h1>${esc(c.name)}</h1>
       ${hasPortrait ? `<a class="xlink" href="#/chars/${enc}">${t('立ち絵 →')}</a>` : ''}</div>
+    ${prof.length ? `<p class="role-prof">${prof.join(' ・ ')}</p>` : ''}${p.desc ? `<details class="role-desc"><summary>${t('プロフィール')}</summary><p>${esc(p.desc)}</p></details>` : ''}
     ${cos}
     ${epBlock(c.quest, `role=${enc}&q=quest`, idx, t('キャラクエスト'))}
-    ${epBlock(c.fureai, `role=${enc}&q=fureai`, idx, t('ふれあい'))}`;
+    ${epBlock(c.fureai, `role=${enc}&q=fureai`, idx, t('ふれあい'))}
+    ${c.present?.length ? `<h2 class="role-sec">${t('バレンタイン企画')}</h2>` + c.present.map((n) =>
+      `<a class="card ep-row ${readSet.has(n.key) ? 'read' : ''}" href="#/play/${encodeURIComponent(n.key)}?role=${enc}"><div class="t">${esc(n.title)}</div>${period(n.start, n.end) ? `<div class="s">${period(n.start, n.end)}</div>` : ''}</a>`).join('') : ''}
+    <div class="voices-sec"></div>`;
   view.querySelectorAll('.play-all').forEach((el) => el.addEventListener('click', (ev) => ev.stopPropagation()));
+  if (c.voices) voiceList(view.querySelector('.voices-sec'), (await getJSON('data/voices.json'))[code] || []);
+}
+
+// Home / town / system voice lines of one character: category chips, grouped by who they're spoken to.
+let voiceAudio = null;
+function voiceList(box, items) {
+  const cats = [...new Set(items.map((i) => i.cat))];
+  let cat = cats[0];
+  const draw = () => {
+    const list = items.filter((i) => i.cat === cat);
+    const groups = [...new Set(list.map((i) => i.to || ''))];
+    box.querySelector('.vlist').innerHTML = groups.map((g) => `${g ? `<h3 class="vto">${esc(t(g))}</h3>` : ''}` +
+      list.filter((i) => (i.to || '') === g).map((i) => `<div class="vline">
+        ${i.voice ? `<button class="vplay" data-src="${esc(i.voice)}" title="${t('再生')}">▶</button>` : `<span class="vplay off" title="${t('音声なし')}">—</span>`}
+        ${i.sub ? `<span class="vsub">${esc(t(i.sub))}</span>` : ''}
+        <span class="vtext">${i.text ? esc(i.text).replace(/\[r=([^\]]*)\]([^\[]*)\[\/r\]/g, '$2').replace(/\n/g, '<br>') : `<span class="muted">${t('（テキストなし）')}</span>`}</span></div>`).join('')).join('');
+  };
+  box.innerHTML = `<h2 class="role-sec">${t('ボイス')} <span class="muted">${items.length}</span></h2>
+    <div class="chips vcats">${cats.map((k) => `<button data-v="${esc(k)}"${k === cat ? ' class="on"' : ''}>${esc(t(k))} <span class="muted">${items.filter((i) => i.cat === k).length}</span></button>`).join('')}</div>
+    <div class="vlist"></div>`;
+  box.querySelector('.vcats').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    cat = b.dataset.v; box.querySelectorAll('.vcats button').forEach((x) => x.classList.toggle('on', x === b)); draw();
+  });
+  box.addEventListener('click', (e) => {
+    const b = e.target.closest('.vplay[data-src]'); if (!b) return;
+    if (voiceAudio) { voiceAudio.pause(); document.querySelectorAll('.vplay.playing').forEach((x) => x.classList.remove('playing')); }
+    voiceAudio = new Audio(b.dataset.src); b.classList.add('playing');
+    voiceAudio.onended = () => b.classList.remove('playing');
+    voiceAudio.play().catch(() => b.classList.remove('playing'));
+  });
+  draw();
+}
+
+// preview / home-base novels that belong to no single event (anime-episode countdowns, new year, features…)
+const noticeTitle = (g) => (g === 'misc' ? t('拠点ノベル・予告') : t('アニメ{n}期 放映前ノベル', { n: g.replace('anime', '') }));
+async function notices(g = 'misc') {
+  const all = await getJSON('data/notices.json');
+  const ns = (Array.isArray(all) ? (g === 'misc' ? all : []) : all[g]) || [];
+  view.innerHTML = `<div class="crumbs"><a href="#/others">${t('その他')}</a></div><h1>${noticeTitle(g)}</h1>
+    <p class="muted">${g === 'misc' ? t('起動時に期間限定で流れたノベルのうち、特定のイベントに属さないもの（日付順）。') : t('TVアニメの各話放送前に起動時に流れたノベル（日付順）。')}</p>
+    <div class="stages flat">${ns.map((n) => `<div class="stage-row"><span class="n">${n.start ? period(n.start, n.end, true) : ''}</span>
+      <a class="${readSet.has(n.key) ? 'read' : ''}" href="#/play/${encodeURIComponent(n.key)}?notices=${encodeURIComponent(g)}">${esc(n.title)}</a></div>`).join('')}</div>`;
 }
 
 async function others(group) {
-  const [o, idx] = await Promise.all([getJSON('data/others.json'), getJSON('data/index.json')]);
+  const [o, idx, nall] = await Promise.all([getJSON('data/others.json'), getJSON('data/index.json'), getJSON('data/notices.json').catch(() => ({}))]);
+  const ngroups = Array.isArray(nall) ? { misc: nall } : nall;
   if (!group) {
     const label = (g) => t({ nextnotice: '次回予告', co_touch: 'ふれあい反応 1', co02_touch: 'ふれあい反応 2', co03_touch: 'ふれあい反応 3', main_quest: 'メイン（未分類）', tutorial: 'チュートリアル' }[g] || g);
     view.innerHTML = `<h1>${t('その他のシナリオ')}</h1><p class="muted">${t('ストーリー一覧に含まれないシナリオ（キー名で分類）。')}</p>
       <input class="search" placeholder="${t('絞り込み…')}">
-      <div class="grid">${Object.entries(o).map(([g, ks]) => `<a class="card" data-q="${esc(g + ' ' + label(g))}" href="#/others/${encodeURIComponent(g)}"><div class="t">${esc(label(g))}</div><div class="s">${t('{n} 本', { n: ks.length })}</div></a>`).join('')}</div>`;
+      <div class="grid">${Object.entries(ngroups).filter(([, v]) => v.length).map(([g, v]) => `<a class="card" data-q="${esc(noticeTitle(g))}" href="#/notices/${g}"><div class="t">${noticeTitle(g)}</div><div class="s">${t('{n} 本', { n: v.length })} ・ ${t('日付順')}</div></a>`).join('')}${Object.entries(o).map(([g, ks]) => `<a class="card" data-q="${esc(g + ' ' + label(g))}" href="#/others/${encodeURIComponent(g)}"><div class="t">${esc(label(g))}</div><div class="s">${t('{n} 本', { n: ks.length })}</div></a>`).join('')}</div>`;
     const inp = view.querySelector('.search');
     inp.oninput = () => view.querySelectorAll('.card').forEach((el) => (el.style.display = el.dataset.q.includes(inp.value) ? '' : 'none'));
     return;
@@ -305,6 +364,8 @@ async function play(key, q) {
     const c = g.cards.find((x) => x.id === +q.get('card'));
     groups = c ? c.stories.map((s) => s.novels) : null;
     back = `#/gacha/${q.get('card')}`;
+  } else if (q.has('notices')) {
+    back = `#/notices/${encodeURIComponent(q.get('notices'))}`;
   } else if (q.has('others')) {
     const o = await getJSON('data/others.json');
     list = o[q.get('others')] || [key];  // independent scenarios — each its own segment

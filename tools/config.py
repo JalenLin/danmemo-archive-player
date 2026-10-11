@@ -26,4 +26,13 @@ def load():
             t[k] = [_abs(p) for p in t.get(k, [])]
     cfg["dec"] = _abs(cfg.get("dec", "dec"))
     cfg["web"] = _abs(cfg.get("web", "web"))
+    # asset manifests (md5 + CDN path per file). Each setup lists only its own; nothing is picked up
+    # from elsewhere in the project, so a Japanese setup never gets global files and vice versa.
+    cfg["cdn"] = _abs(cfg.get("cdn", "cdn"))                   # fetch_manifests.py writes here
+    cfg["downloads"] = _abs(cfg.get("downloads", "assets"))    # download.py / fill_gaps.py write here
+    cfg["manifests"] = [_abs(p) for p in cfg.get("manifests", [os.path.join(cfg["cdn"], "project.manifest*"),
+                                                                 os.path.join(cfg["cdn"], "manifests", "*")])]
+    cfg["legacy_manifests"] = _abs(cfg.get("legacy_manifests", os.path.join(cfg["cdn"], "legacy")))  # legacy_manifests.py
+    # opt-in only: manifests of ANOTHER region's app used to fill gaps (their files may carry its language)
+    cfg["fallback_manifests"] = [_abs(p) for p in cfg.get("fallback_manifests", [])]
     return cfg

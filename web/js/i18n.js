@@ -35,6 +35,49 @@ const D = {
   'その他のシナリオ': ['Other Scenarios', '其他劇情'],
   'エンドクレジット': ['End Credits', '片尾名單'],
   'ムービー': ['Movies', '影片'],
+  'ボイス': ['Voices', '語音'],
+  'その他のイベント': ['Other Events', '其他活動'],
+  '復刻イベント': ['Reruns', '復刻活動'],
+  '内容が初回と異なる復刻イベント（新しい順）。': ['Reruns whose content differs from the first run (newest first).', '內容和首次舉辦不同的復刻活動（由新到舊）。'],
+  'メモリアルアプリのアルバムに収録されていない、開催期間のあるイベント（新しい順）。': ["Events with a run period that the memorial app's album leaves out (newest first).", '紀念版相簿沒有收錄、但有開催期間的活動（由新到舊）。'],
+  '予告・拠点ノベル': ['Previews & home-screen stories', '預告・據點劇情'],
+  '拠点ノベル・予告': ['Home-screen stories & previews', '據點劇情・預告'],
+  '日付順': ['by date', '依日期'],
+  'アニメ{n}期 放映前ノベル': ['TV anime season {n}: pre-broadcast stories', '動畫第 {n} 期 播出前劇情'],
+  'TVアニメの各話放送前に起動時に流れたノベル（日付順）。': ['Stories the game played at start-up before each TV-anime episode aired, by date.', '動畫每集播出前，遊戲啟動時播放的劇情（依日期）。'],
+  '起動時に期間限定で流れたノベルのうち、特定のイベントに属さないもの（日付順）。': ['Stories the game played at start-up for a limited time that belong to no single event, by date.', '遊戲啟動時限期播放、不屬於特定活動的劇情（依日期）。'],
+  'バレンタイン企画': ['Valentine event', '情人節企劃'],
+  'バレンタイン': ['Valentine', '情人節'],
+  'ボイス {n}': ['Voices {n}', '語音 {n}'],
+  'キャラクターごとの衣装エピソード・キャラクエスト・ふれあい・ボイス。': ['Costume episodes, character quests, interaction stories and voice lines per character.', '每個角色的服裝劇情、角色任務、互動劇情與語音。'],
+  'プロフィール': ['Profile', '角色介紹'],
+  '{n}歳': ['age {n}', '{n} 歲'],
+  '再生': ['Play', '播放'],
+  '音声なし': ['No audio', '無語音'],
+  '（テキストなし）': ['(no text)', '（無文字）'],
+  'ログイン': ['Login', '登入'],
+  '交流ページ': ['Communication page', '交流頁'],
+  '挨拶': ['Greetings', '問候'],
+  'タッチ': ['Touch', '觸摸'],
+  '交流': ['Talk', '交流'],
+  '放置': ['Idle', '放置'],
+  '街': ['Town', '城鎮'],
+  'アラーム': ['Alarm', '鬧鐘'],
+  '衣装チェンジ': ['Costume change', '換裝'],
+  'システム': ['System', '系統'],
+  'ベル向け': ['to Bell', '對貝爾'],
+  'アイズ向け': ['to Ais', '對艾絲'],
+  'レフィーヤ向け': ['to Lefiya', '對蕾菲亞'],
+  '頭': ['Head', '頭'],
+  '体': ['Body', '身體'],
+  '朝': ['Morning', '早'],
+  '昼': ['Day', '午'],
+  '夕': ['Evening', '傍晚'],
+  '夜': ['Night', '晚'],
+  'タイトルコール': ['Title call', '標題語音'],
+  'ステータス': ['Status', '狀態'],
+  'フレンド': ['Friend', '好友'],
+  'プレゼント': ['Present', '禮物'],
   '6周年ムービー': ['6th Anniversary Movies', '6 周年影片'],
   '登場するお話': ['Appears in', '出處劇情'],
   'ホーム': ['Home', '首頁'],
@@ -198,17 +241,17 @@ function jst(sec) {
   return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate(), wd: d.getUTCDay(),
            hm: `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}` };
 }
-export function period(start, end) {
+export function period(start, end, bare = false) {
   if (!start || !end) return '';
   const a = jst(start), b = jst(end);
   if (b.y >= 2030) return '';
   if (lang === 'en') {
-    return `Event period: ${DAY[a.wd]}, ${MON[a.m - 1]} ${a.d}, ${a.y} – ${DAY[b.wd]}, ${MON[b.m - 1]} ${b.d}${b.y !== a.y ? `, ${b.y}` : ''}, ${b.hm} JST`;
+    return `${bare ? '' : 'Event period: '}${DAY[a.wd]}, ${MON[a.m - 1]} ${a.d}, ${a.y} – ${DAY[b.wd]}, ${MON[b.m - 1]} ${b.d}${b.y !== a.y ? `, ${b.y}` : ''}, ${b.hm} JST`;
   }
   const w = WEEK[lang];
-  const label = lang === 'zh' ? '活動期間' : '開催期間';
+  const label = bare ? '' : (lang === 'zh' ? '活動期間' : '開催期間') + '：';
   const hm = lang === 'ja' ? b.hm.replace(':', '：') : b.hm;  // the game writes a full-width colon
-  return `${label}：${a.y}年${a.m}月${a.d}日（${w[a.wd]}）〜${b.m}月${b.d}日（${w[b.wd]}）${hm}`;
+  return `${label}${a.y}年${a.m}月${a.d}日（${w[a.wd]}）〜${b.y !== a.y ? `${b.y}年` : ''}${b.m}月${b.d}日（${w[b.wd]}）${hm}`;
 }
 
 // Static markup: data-i18n (text), data-i18n-title, data-i18n-placeholder.

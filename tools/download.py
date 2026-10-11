@@ -19,8 +19,8 @@ import config  # noqa: E402
 
 ROOT = config.ROOT
 CDN = re.search(rb"https://cdn-[\w.-]+\.akamaized\.net", open(config.load()["libapp"], "rb").read()).group(0).decode() + "/"
-MAN = f"{ROOT}/cdn"
-OUT = f"{ROOT}/assets"
+MAN = config.load()["cdn"]
+OUT = config.load()["downloads"]
 
 
 def jobs():
@@ -94,7 +94,7 @@ def main():
                     el = time.time() - t0
                     print(f"{done}/{len(js)} files, {nbytes / 1e9:.2f}/{total / 1e9:.2f} GB, "
                           f"{el / 60:.1f} min, fails={len(fails)}", flush=True)
-    with open(f"{ROOT}/cdn/download_failures.txt", "w") as f:
+    with open(f"{MAN}/download_failures.txt", "w") as f:
         for k, st in fails:
             f.write(f"{k}\t{st}\n")
     print("done; failures:", len(fails), flush=True)

@@ -16,6 +16,15 @@
     "x/base/assets/common"
   ],
 
+  "_comment_manifests": "Where this setup's asset manifests live. Defaults shown; only these are used, nothing else in the project.",
+  "cdn": "cdn",
+  "downloads": "assets",
+  "manifests": ["cdn/project.manifest*", "cdn/manifests/*"],
+  "legacy_manifests": "cdn/legacy",
+
+  "_comment_fallback": "Optional, off by default: another region's manifests to fill gaps from. Their files may carry that region's language (e.g. English banners in a Japanese build).",
+  "fallback_manifests": [],
+
   "translations": {
     "en": {
       "_comment": "Optional: an English (global) app-data dump, e.g. contents/1/master/...",

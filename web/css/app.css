@@ -331,3 +331,22 @@ table.stat img.grade { height: 20px; vertical-align: middle; }
 .movie-card .body .s { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
 .movie-card .ep { display: block; font-size: 14px; line-height: 1.45; padding: 3px 0; }
 .movie-card .ep::before { content: "▶ "; color: var(--gold); font-size: 11px; }
+
+/* character voices */
+.role-prof { color: var(--muted); margin: 6px 0 4px; font-size: 14px; }
+.role-prof b { color: var(--gold-2); }
+.role-desc { margin: 4px 0 8px; font-size: 14px; color: var(--muted); }
+.role-desc summary { cursor: pointer; color: var(--gold); }
+.role-desc p { white-space: pre-line; margin: 6px 0 0; }
+.vcats { margin-bottom: 8px; }
+.vto { font-size: 14px; color: var(--gold-2); margin: 14px 0 6px; }
+.vline { display: flex; align-items: flex-start; gap: 10px; padding: 7px 4px; border-bottom: 1px solid var(--line); }
+.vplay { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--gold); cursor: pointer; font-size: 12px; }
+.vplay.playing { background: var(--gold); color: #000; }
+.vplay.off { display: grid; place-items: center; color: var(--muted); cursor: default; }
+.vsub { flex: none; font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; margin-top: 5px; }
+.vtext { line-height: 1.6; padding-top: 4px; }
+.card.ep-row { margin-bottom: 6px; }
+.notices { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; padding: 6px 4px 10px; margin-bottom: 4px; border-bottom: 1px dashed var(--line); font-size: 14px; }
+.notices a { color: var(--gold-2); }
+.notices a.read { opacity: .6; }

@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config
 
 cfg = config.load()
-OUT = os.path.join(config.ROOT, "cdn")
+OUT = config.load()["cdn"]
 data = open(cfg["libapp"], "rb").read()
 host = re.search(rb"https://cdn-[\w.-]+\.akamaized\.net", data).group(0).decode()
 m = re.search(rb'"remoteManifestUrl": "\{\}/(manifests/(\w+)/(\w+))/project\.manifest\.1/([0-9a-f]{32})"', data)

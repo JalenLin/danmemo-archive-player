@@ -11,12 +11,12 @@
 ## 功能
 
 - **ストーリー**：主線、活動、角色劇情的完整目錄。同內容的復刻合併成一筆；紀念版相簿已收錄的篇目會連到相簿。活動顯示開催期間，部分有橫幅。
-- **アルバム**：照紀念版 App 的「周年ストーリー／イベントストーリー」重現（48 篇，官方橫幅與開催期間）。
-- **キャラストーリー（角色劇情）**：每個角色的服裝劇情、キャラクエ、ふれあい。
+- **アルバム**：照紀念版 App 的「周年ストーリー／イベントストーリー」重現（48 篇，官方橫幅與開催期間），另加三個分頁：紀念版沒收、但有開催期間的「その他のイベント」「降臨イベント」，以及內容和初回不同的「復刻イベント」。
+- **キャラストーリー（角色劇情）**：每個角色的服裝劇情、キャラクエ、ふれあい，以及個人資料和語音（登入、問候、觸摸、交流、城鎮、鬧鐘、換裝、系統；日版約 8,300 句）。
 - **立ち絵（角色立繪）**：立繪與表情鑑賞。
 - **カード（卡片）**：卡片能力值與抽卡演出（國際版資料用官方英文名牌；日版用舊版 APK 的清單可找回約 342 張官方名牌，由 `fill_gaps.py` 下載，其餘依稀有度配色自動產生；抽卡台詞是直書圖片，同樣由 `fill_gaps.py` 取得：日版約 281 張、國際版約 690 張）。
 - **ムービー（影片）**：劇情裡的過場影片（例如 6 周年 SO12 的 7 支），可以單獨觀看，並連到出處劇情。
-- **その他（其他）**：不在目錄裡的劇情片段。
+- **その他（其他）**：不在目錄裡的劇情片段；次回予告／據點劇情能對應到活動的放在該活動最前面，其餘依日期列在「拠点ノベル・予告」。
 - 播放器：AUTO、SKIP（按住左 Ctrl 或切換）、LOG（可重播語音）、隱藏（隱藏對話框截圖用，H 鍵或右鍵）、設定（文字框顏色／不透明度、SKIP 間隔）、同一章節連續播放、已讀紀錄。
 - 介面語言：中文／English／日本語，右上角切換，預設跟著瀏覽器語言。劇情文字維持建置時所用資料的語言。
 
@@ -70,6 +70,8 @@ cp config.example.json config.json   # 依實際路徑修改
 - `asset_roots`：素材根目錄，**越前面越優先**（每個根目錄底下是 `files/...`）
 - `novel_dirs`、`master_dirs`：`.enc` 檔所在的資料夾
 - `translations.en`（選用）：國際版的劇情與主資料，用於第二階段翻譯
+- `manifests`、`legacy_manifests`：這套設定自己的素材清單（預設是 `cdn/` 裡的紀念版清單和 `cdn/legacy/`）。程式只讀這裡列的，不會自動用專案裡其他地方的清單
+- `fallback_manifests`（選用，預設空）：用其他地區（例如國際版）的清單補缺。補進來的圖可能是那個地區的語言
 - 想同時保留多套設定：各寫一個設定檔，用環境變數 `DANMEMO_CONFIG=路徑` 指定（每支工具都支援，也可以各自設定 `dec`、`web` 輸出位置）
 
 ### 4. 準備素材
@@ -94,10 +96,23 @@ for f in assets/files/movie/*.usm; do ./venv/bin/python tools/usm.py "$f" "${f%.
 ```bash
 ./venv/bin/python tools/decrypt_all.py
 ./venv/bin/python tools/build_web.py
-./venv/bin/python tools/legacy_manifests.py 舊版.apk  # 選用：有 8.x 以前的日版 APK 時，取得當時的線上清單（日文橫幅、名牌等）
-./venv/bin/python tools/fill_gaps.py      # 選用：補下載紀念版清單沒有、但劇情用得到的素材，之後再跑一次 build_web.py
+./venv/bin/python tools/legacy_manifests.py 舊版.apk  # 建議：8.x 以前（2019 年）的日版 APK，見下方說明
+./venv/bin/python tools/fill_gaps.py
+./venv/bin/python tools/build_web.py
 ./venv/bin/python tools/serve.py          # 開啟 http://localhost:8080/
 ```
+
+紀念版沒有抽卡功能，清單也少了很多劇情用到的檔案。紀念版以外的日文素材都要靠舊版線上版：`legacy_manifests.py` 讀出 8.x APK 內附的清單網址（這些清單至今仍可下載），`fill_gaps.py` 再依清單下載卡圖、抽卡演出與語音、日文名牌與台詞、活動橫幅和劇情素材（影片會自動轉 MP4，活動語音 zip 會自動解開）。從零實測（2026-10）：
+
+| | 只有紀念版 | 加 8.2.0 APK |
+|---|---|---|
+| 素材全部齊全的劇情 | 4,480 / 11,462 | 10,531 |
+| 劇情頁橫幅 | 0 | 160 |
+| 有卡圖／抽卡語音的卡片 | 8／42 | 297／281 |
+| 官方名牌／抽卡台詞 | 108／75（2017 年快照） | 342／281 |
+| 抽卡演出（動畫、開場影片） | 無 | 有 |
+
+2019 年 9 月以後的卡片和活動只有國際版資料。要混用的話，在 `config.json` 的 `fallback_manifests` 列出國際版清單，補進來的圖會是英文。
 
 要讓同一個網路的手機觀看：`tools/serve.py 8080 0.0.0.0`，再用電腦的區網 IP 連線。
 
@@ -123,11 +138,10 @@ tools/build_web.py      產生 web/data/（劇情目錄、相簿、每段劇情�
 tools/fetch_manifests.py 抓 CDN 的素材清單
 tools/download.py       從 CDN 下載素材（續傳、MD5 驗證）
 tools/legacy_manifests.py 從舊版（2019 年以前、舊制 CDN）APK 讀出遠端清單 → cdn/legacy/，供 fill_gaps.py 補日文原版素材
-tools/fill_gaps.py      補下載劇情用到但手上沒有的素材（日版清單優先，國際版／備份內附清單補缺；已設定的素材目錄有的就不下載）
+tools/fill_gaps.py      補下載劇情用到但手上沒有的素材（只用這套設定自己的清單：config 的 manifests、legacy_manifests 和備份內附的清單；其他地區的清單要寫進 fallback_manifests 才會用；已設定的素材目錄有的就不下載）
 tools/config.py         讀取 config.json（或 DANMEMO_CONFIG 指定的設定檔）
 tools/cardstat.py       卡片能力值計算（對照紀念版「キャラ詳細」畫面反推）
 tools/download_extra.py 依清單格式的 JSON 下載額外素材
-tools/gacha_voice_alias.json  抽卡語音沿用劇情語音的對照（只有檔名）
 tools/usm.py            CRI USM → MP4
 tools/gachanames.py     抽卡演出的名牌圖（build_web.py 會呼叫）
 tools/serve.py          本機伺服器（支援 Range）

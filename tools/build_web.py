@@ -25,7 +25,6 @@ import config
 CFG = config.load()
 DEC = CFG["dec"]
 WEB = CFG["web"]
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def link_roots():
@@ -52,23 +51,45 @@ GACHA_VOICE_ALIAS = {}
 
 def gacha_voice(f75):
     """Resolve a card's gacha-hit voice (pc field 75) to a served path: the dedicated recording if
-    present, else the aliased story voice it points to (per gacha_voice_alias.json)."""
+    present, else the story voice the voice table points it at."""
     if not f75:
         return None
     direct = VOICE.get("voice_" + f75.split(".", 1)[1])
     return direct or VOICE.get(GACHA_VOICE_ALIAS.get(f75, ""))
 
-# Event list cells the offline app doesn't ship (it has only the album's 48) exist solely in the global
-# app's CDN set; most are localised, but these early ones reuse the Japanese artwork (checked by eye).
-JP_TEXT_CELLS = {
-    7090000101, 7090000102, 7090000201, 7090000301, 7090000401, 7090000501, 7090000601, 7090000701,
-    7090000901, 7090001001, 7090001101, 7090001201, 7090001401, 7090010101,
-    7090020101, 7090030101, 7090040101, 7090050101, 7090060101, 7090070101, 7090080101, 7090090101,
-    7090100101, 7090110101, 7090120201, 7090120202, 7090120203, 7090120204,
-}
-
 # The memorial app's album picks 48 of the original events (adventureEpisode f29 = section, f30 = order).
 # Other app data (e.g. the global client's) has the same episodes but not this selection; use it then.
+# Preview / home-base ("拠点") novels the game played at start-up for a while (startNovel), mapped to the
+# event episode they belong to: novel.nextnotice_<n> -> adventureEpisode id. Matched by run dates, title,
+# dialogue and reused event voice lines, then checked by hand (anniversary series by part; reruns -> the
+# original). The rest (anime-episode countdowns, new year, tests, feature intros) get their own dated list.
+NEXTNOTICE_EVENT = {
+    2: 7090000901, 5: 7090001101, 6: 7090001201, 8: 7090001401,
+    10: 7090001501, 11: 7090001601, 12: 7090001701, 14: 7090001801,
+    15: 7160000101, 16: 7160000101, 19: 7090002001, 22: 7090002101,
+    27: 7090002501, 28: 7090002701, 29: 7090002801, 31: 7090003101,
+    32: 7090120210, 33: 7090003301, 37: 7090003401, 38: 7090003601,
+    39: 7090003701, 40: 7090004001, 54: 7160000201, 55: 7160000301,
+    60: 7090004301, 61: 7090004501, 62: 7090004701, 63: 7090005101,
+    65: 7090004901, 66: 7090005301, 68: 7010000505, 69: 7090005501,
+    70: 7090005901, 71: 7090006001, 72: 7090006201, 73: 7090006301,
+    74: 7160000401, 75: 7160000501, 76: 7160000601, 77: 7090006401,
+    89: 7090006601, 90: 7090006701, 91: 7090006801, 93: 7090007101,
+    95: 7090007301, 96: 7090007501, 97: 7090007901, 98: 7090007701,
+    99: 7160000701, 100: 7160000801, 101: 7160000901, 102: 7090008501,
+    103: 7090008701, 104: 7090008901, 105: 7090009101, 106: 7090009301,
+    107: 7090009401, 109: 7160001001, 110: 7090009601, 111: 7010000516,
+    112: 7010000522, 113: 7160001301, 114: 7160001401, 126: 7160001501,
+    127: 7090010201, 128: 7010000526, 130: 7090010501, 131: 7090010701,
+    134: 7090010901, 135: 7090010801, 147: 7010000532, 148: 7010000543,
+    149: 7160001901, 150: 7160002001, 151: 7160002101,
+    # anniversaries: the 1st-anniversary "DanMemo FES 2018" announcement; the daily countdown to the 2nd
+    # anniversary (2019-06-07..18), whose last part leads into Argonaut
+    17: 7090001801,
+    42: 7160000201, 43: 7160000201, 44: 7160000201, 45: 7160000201, 46: 7160000201, 47: 7160000201,
+    48: 7160000201, 49: 7160000201, 50: 7160000201, 51: 7160000201, 52: 7160000201, 53: 7160000201,
+}
+
 ALBUM_DEFAULT = {
     7160000101: (1, 100), 7160000201: (1, 99), 7160000301: (1, 97), 7160000401: (1, 95), 7160000501: (1, 92),
     7160000601: (1, 89), 7160000701: (1, 87), 7160000801: (1, 84), 7160000901: (1, 82), 7160001301: (1, 81),
@@ -90,6 +111,11 @@ CATEGORY = {1: "メイン", 2: "キャラクエ", 3: "ふれあい", 4: "衣装"
             25: "ウィークリークエスト", 26: "七闘領域", 27: "決戦試練", 28: "派閥大戦"}
 # 2=キャラクエ, 3=ふれあい, 4=衣装 are shown under the per-character view (characters.json), not the main tree
 HIDDEN_CATEGORIES = {2, 3, 4}
+# album tabs beyond the memorial app's own two: section -> event categories whose dated episodes it collects
+#   extra = story events incl. short stories, map and raid events; advent = descent (降臨) events
+EXTRA_ALBUM = {"extra": {9, 16, 17}, "advent": {8}, "rerun": set()}  # rerun: any of those whose title says so
+# a rerun as this data's own title marks it (the global server's first runs of JP reruns carry no marker)
+RERUN_RE = re.compile(r"復刻|\bre-?run\b", re.I)
 
 
 def s32(x):
@@ -108,19 +134,23 @@ def find(rel):
     return None
 
 
-def jp_md5s():
-    """md5s of Japanese-original files: the memorial app's manifests + old JP online builds'
-    (cdn/legacy/, tools/legacy_manifests.py). Used to tell a JP list cell from a global (English) one."""
+def native_md5s():
+    """md5s of the files this setup's own manifests list (config "manifests" + "legacy_manifests"). With
+    "fallback_manifests" configured, another region's files can land in the asset roots; a JP build uses
+    this to show only list cells that are its own (Japanese) artwork."""
     out = set()
-    for f in glob.glob(os.path.join(ROOT, "cdn", "project.manifest*")) + glob.glob(os.path.join(ROOT, "cdn", "legacy", "*", "*.manifest*")):
+    pats = CFG["manifests"] + [os.path.join(CFG["legacy_manifests"], "*", "*.manifest*")]
+    for f in [f for p in pats for f in glob.glob(p) if os.path.isfile(f)]:
         try:
-            out.update(v["md5"] for v in json.load(open(f))["assets"].values())
-        except (OSError, ValueError, KeyError):
-            pass
+            d = json.load(open(f))
+        except (OSError, ValueError):
+            continue
+        out.update(v["md5"] for v in (d.get("assets") or {}).values())
+        out.update(v["md5"] for v in list(d.get("singleImages", {}).values()) + list(d.get("episodes", {}).values()))
     return out
 
 
-def is_jp_file(rel, md5s):
+def is_native(rel, md5s):
     for _, disk in ROOTS:
         if os.path.exists(disk + rel):
             return hashlib.md5(open(disk + rel, "rb").read()).hexdigest() in md5s
@@ -167,6 +197,87 @@ def portrait_info(dirname):
                 info["bs"] = size("body")
             return info
     return None
+
+# Home-screen / town voice lines kept as "novels" (one line each): touch, greetings, idle talk, the
+# communication page and town chatter. They are listed per character, not as stories.
+#   co_ / co02_ / co03_ (sys_ / sys02_ / sys03_) = the version spoken to Bell / Ais / Lefiya
+INTERACTION_RE = re.compile(r"^novel\.(?:co\d*_(?:[hb]_touch|[dmn]_greet|talk|hold)|reaction|sys\d*_town(?:_talk)?)_([a-z]+)_")
+INTERACTION = {}
+VOICE_TO = {"": "ベル向け", "02": "アイズ向け", "03": "レフィーヤ向け"}
+VOICE_CATS = ["ログイン", "交流ページ", "挨拶", "タッチ", "交流", "放置", "街", "アラーム", "衣装チェンジ", "システム"]
+
+
+def voice_kind(name):
+    """(category, sub label, addressee, character code) for a voice/novel name like co02_b_touch_ais_01."""
+    m = re.match(r"(?:novel\.|voice\.)?co(\d*)_([hb])_touch_([a-z]+)_", name)
+    if m:
+        return "タッチ", {"h": "頭", "b": "体"}[m.group(2)], VOICE_TO.get(m.group(1), ""), m.group(3)
+    m = re.match(r"(?:novel\.|voice\.)?co(\d*)_([dmn])_greet_([a-z]+)_", name)
+    if m:
+        return "挨拶", {"m": "朝", "d": "昼", "n": "夜"}[m.group(2)], VOICE_TO.get(m.group(1), ""), m.group(3)
+    m = re.match(r"(?:novel\.|voice\.)?co(\d*)_(talk|hold)_([a-z]+)_", name)
+    if m:
+        return {"talk": "交流", "hold": "放置"}[m.group(2)], "", VOICE_TO.get(m.group(1), ""), m.group(3)
+    m = re.match(r"(?:novel\.|voice\.)?reaction_([a-z]+)_([a-z]+)_", name)
+    if m:
+        return "交流ページ", {"morning": "朝", "noon": "昼", "evening": "夕", "night": "夜"}.get(m.group(2), m.group(2)), "", m.group(1)
+    m = re.match(r"(?:novel\.|voice\.)?sys(\d*)_town(?:_talk)?_([a-z]+)_", name)
+    if m:
+        return "街", "", VOICE_TO.get(m.group(1), ""), m.group(2)
+    return None
+
+
+def build_voices(chars_tbl):
+    """data/voices.json: per character, the home/town voice lines (text from the novels and the master
+    tables, audio from this setup's own assets), plus voice files with no text anywhere (listed as such)."""
+    per = collections.defaultdict(list)  # code -> items
+    seen = set()
+
+    def add(code, cat, sub, to, text, vref, order):
+        path = VOICE.get("voice_" + vref.split(".", 1)[1]) if vref else None
+        if vref:
+            seen.add("voice_" + vref.split(".", 1)[1])
+        per[code].append({"cat": cat, "sub": sub, "to": to, "text": text, "voice": path, "o": order})
+
+    for key, (text, vref) in sorted(INTERACTION.items()):
+        k = voice_kind(key)
+        if k:
+            add(k[3], k[0], k[1], k[2], text, vref, key)
+    for code, r in chars_tbl.items():  # login lines + system calls (character table)
+        for tf, vf in (("9", "16"), ("10", "17")):
+            if r.get(vf):
+                add(code, "ログイン", "", "", r.get(tf, ""), r[vf], vf)
+        for vf, label in (("18", "タイトルコール"), ("19", "ステータス"), ("20", "ステータス"), ("21", "フレンド"),
+                          ("22", "プレゼント"), ("23", "プレゼント")):
+            if r.get(vf):
+                add(code, "システム", label, "", "", r[vf], vf)
+    for r in table("alarmVoice"):
+        code = re.sub(r"\d+$", "", r.get("1", "").split(".", 1)[-1])
+        if r.get("10"):
+            add(code, "アラーム", r.get("2", ""), "", r.get("3", ""), r["10"], r["0"])
+    for r in table("characterCostume"):
+        code = r.get("1", "").split(".", 1)[-1]
+        if r.get("7"):
+            add(code, "衣装チェンジ", r.get("3", ""), "", "", r["7"], r["0"])
+    # voice files this setup has (e.g. from an old build's manifest) that no text points at
+    for base, path in sorted(VOICE.items()):
+        if base in seen:
+            continue
+        k = voice_kind(base[6:])
+        if k:
+            per[k[3]].append({"cat": k[0], "sub": k[1], "to": k[2], "text": "", "voice": path, "o": base})
+    out = {}
+    for code, items in per.items():
+        if not any(i["voice"] or i["text"] for i in items):
+            continue
+        items.sort(key=lambda i: (VOICE_CATS.index(i["cat"]), list(VOICE_TO.values()).index(i["to"]) if i["to"] in VOICE_TO.values() else 9, i["sub"], str(i["o"])))
+        out[code] = [{k: v for k, v in i.items() if k != "o" and v != ""} for i in items]
+    json.dump(out, open(f"{WEB}/data/voices.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    n = sum(len(v) for v in out.values())
+    print("voices: characters", len(out), "lines", n, "with audio", sum(1 for v in out.values() for i in v if i.get("voice")),
+          "with text", sum(1 for v in out.values() for i in v if i.get("text")))
+    return out
+
 
 MOVIE_GROUPS = [("6th_movie_", "6周年ムービー")]  # file-name prefix -> section title (others: "ムービー")
 
@@ -235,12 +346,12 @@ def main():
     voice = index_dir(["files/sound/voice", "files/sound/voice_common", "files/sound/voice_episode"], ".ogg")
     global VOICE, GACHA_VOICE_ALIAS
     VOICE = voice
-    # Some gacha-hit voices are aliases to a real (story) voice file; map built from the global
-    # backup's voice table (tools/gacha_voice_alias.json). Optional — absent is fine.
-    try:
-        GACHA_VOICE_ALIAS = json.load(open(os.path.join(os.path.dirname(__file__), "gacha_voice_alias.json"), encoding="utf-8"))
-    except Exception:
-        GACHA_VOICE_ALIAS = {}
+    # Some gacha-hit voices reuse a story recording: the voice table points them at that file.
+    GACHA_VOICE_ALIAS = {}
+    for r in table("voice"):
+        k, f = str(r.get("1", "")), os.path.basename(str(r.get("2", "")))
+        if k.startswith("voice.sys_gachahit") and f and f != "voice_" + k[6:]:
+            GACHA_VOICE_ALIAS[k] = f
     print("sound files", len(snd), "voice files", len(voice), "gacha voice aliases", len(GACHA_VOICE_ALIAS))
 
     pinfo_cache = {}
@@ -273,6 +384,7 @@ def main():
     # ---- novels
     keyre = re.compile(r"^(single_image|novel_portrait|bgm|se|voice|scenario_lwf|battle_effect|movie_usm)\.[\w.\-]+$")
     novels = {}
+    interaction = {}  # novel key -> (line, voice ref) for the per-character voice lists (not stories)
     movie_refs = collections.defaultdict(list)  # movie_usm key -> [(novel id, novel key)] for the movie page
     lines = {}  # novel key -> its dialogue, to recognise rerun copies
     missing = collections.Counter()
@@ -300,6 +412,9 @@ def main():
                   open(f"{WEB}/data/novel/{key}.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
         novels[key] = title
         lines[key] = tuple(c[-1] for c in out if c[0] in (11, 12, 45) and len(c) > 1)
+        if INTERACTION_RE.match(key):
+            vref = next((t for t in res if t.startswith("voice.")), None)
+            interaction[key] = ("\n".join(c[-1] for c in out if c[0] in (11, 12, 45) and len(c) > 1), vref)
     print("novels", len(novels), "unresolved asset refs", dict(missing))
 
     # ---- story tree
@@ -322,7 +437,7 @@ def main():
     # the JP memorial app's data marks its album (f29); other app data (e.g. global) has its own,
     # localised list cells for every event, so show them all there
     memorial = any(r.get("29") for r in table("adventureEpisode"))
-    jp = jp_md5s() if memorial else set()
+    native = native_md5s() if memorial and CFG["fallback_manifests"] else None
     for a in adv:
         cat = a.get("2")
         ad = {"title": a.get("4", "").strip(), "key": a["1"], "episodes": []}
@@ -331,7 +446,8 @@ def main():
             if e.get("6") and e.get("7"):  # 開催期間 (unix time)
                 ep["start"], ep["end"] = e["6"], e["7"]
             rel = f"files/adventure/episode_list_cell/{e['0']}.png"
-            if not memorial or e["0"] in JP_TEXT_CELLS or is_jp_file(rel, jp):
+            # the memorial app ships only the album's cells; others come from the configured manifests
+            if native is None or is_native(rel, native):
                 cell = find(rel)
                 if cell:
                     ep["banner"] = cell
@@ -361,7 +477,70 @@ def main():
             cats.setdefault(cat, []).append(ad)
     # ---- アルバム, as in the offline app: adventureEpisode f29 = section (1 周年ストーリー, 2 イベントストーリー),
     # f30 = order (descending), f6/f7 = 開催期間 (unix time); banner = episode_list_cell/<episode id>.png (605x140)
-    album = {"anniversary": [], "event": []}
+    # ---- side stories the event unlocked as you levelled its rental character (pcGuestLevelStep), added to
+    # that event (pcGuest f7) after its own stages, under the titles the table gives them
+    guest_ep = {r["0"]: r.get("7") for r in table("pcGuest")}
+    for r in sorted(table("pcGuestLevelStep"), key=lambda r: (r.get("1", 0), r.get("2", 0))):
+        ep, k = ep_by_id.get(guest_ep.get(r.get("1"))), r.get("9")
+        if ep and k in novels and k not in used:
+            ep["stages"].append({"title": r.get("10", "").strip() or novels[k], "novels": [k]})
+            used.add(k)
+    # ...and follow-up parts (<key>_01, _02…) of a story an episode already has, right after it
+    for k in sorted(novels):
+        m = re.match(r"(.+)_(\d\d)$", k)
+        if not m or k in used or m.group(1) not in used:
+            continue
+        for ep in ep_by_id.values():
+            for st in ep["stages"]:
+                if m.group(1) in st["novels"]:
+                    st["novels"].insert(st["novels"].index(m.group(1)) + 1, k)
+                    used.add(k)
+                    break
+            if k in used:
+                break
+
+    # ---- preview / home-base novels: attach to their event, list the rest by date
+    notice_run = {}
+    for r in table("startNovel"):
+        k = r.get("1", "")
+        if k.startswith("novel.nextnotice_"):
+            a0, b0 = notice_run.get(k, (None, None))
+            notice_run[k] = (min(x for x in (a0, r.get("2")) if x) if (a0 or r.get("2")) else None,
+                             max(x for x in (b0, r.get("3")) if x) if (b0 or r.get("3")) else None)
+    for n, eid in NEXTNOTICE_EVENT.items():
+        k = f"novel.nextnotice_{n:05d}"
+        if k in novels and eid in ep_by_id:
+            ep_by_id[eid].setdefault("notices", []).append({"key": k, "title": novels[k]})
+            used.add(k)
+    for ep in ep_by_id.values():  # in the order the game played them
+        if ep.get("notices"):
+            ep["notices"].sort(key=lambda n: (notice_run.get(n["key"], (None,))[0] or 0, n["key"]))
+    notices = sorted(({"key": k, "title": novels[k], "start": notice_run.get(k, (None, None))[0], "end": notice_run.get(k, (None, None))[1]}
+                      for k in novels if k.startswith("novel.nextnotice_") and k not in used),
+                     key=lambda x: (x["start"] or 0, x["key"]))
+    for x in notices:
+        used.add(x["key"])
+    # TV-anime previews get a list per season: "3期5話放映前拠点" …; the 2019 countdown is season 2
+    groups = collections.OrderedDict([("misc", [])])
+    for x in notices:
+        m = re.search(r"(\d)期", x["title"])
+        season = m.group(1) if m else "2" if "アニメカウントダウン" in x["title"] else None
+        groups.setdefault(f"anime{season}" if season else "misc", []).append(x)
+    groups = collections.OrderedDict([("misc", groups.pop("misc"))] + sorted(groups.items()))
+    json.dump(groups, open(f"{WEB}/data/notices.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    print("preview novels: on events", sum(len(e.get("notices", [])) for e in ep_by_id.values()),
+          "dated lists", {k: len(v) for k, v in groups.items()})
+
+    # ---- the story tree lists each story once: rerun ("復刻") episodes with the same story are merged
+    # into the first, and episodes the album holds are left out (categories left empty disappear). A rerun's <key>ex novels
+    # are the same story as <key> when the dialogue matches (416 identical, 16 differ only in staging).
+    def canon(k):
+        return k[:-2] if k.endswith("ex") and k[:-2] in lines and lines[k] == lines[k[:-2]] else k
+
+    def sig(ep):
+        return tuple(canon(k) for st in ep["stages"] for k in st["novels"])
+
+    album = {"anniversary": [], "event": [], **{k: [] for k in EXTRA_ALBUM}}
     episodes = table("adventureEpisode")
     has_album = any(e.get("29") for e in episodes)
     for e in episodes:
@@ -372,21 +551,41 @@ def main():
             album[sec].append({"key": e["1"], "title": ep["title"], "order": order,
                                "start": e.get("6"), "end": e.get("7"),
                                "banner": find(f"files/adventure/episode_list_cell/{e['0']}.png"),
-                               "stages": ep["stages"]})
+                               "stages": ep["stages"], "notices": ep.get("notices", [])})
+    # extra tabs: events the memorial album leaves out — every episode of those categories with a run period
+    # whose story no album entry holds yet (reruns with changed content get their own tab; newest first)
+    adv_cat = {a0["0"]: a0.get("2") for a0 in table("adventure")}
+    taken = {sig(x) for sec in ("anniversary", "event") for x in album[sec]}
+    for e in sorted(episodes, key=lambda e: (e.get("6") or 0, e["0"])):
+        ep = ep_by_id.get(e["0"])
+        sec = next((k for k, cs in EXTRA_ALBUM.items() if adv_cat.get(e.get("2")) in cs), None)
+        if sec and ep and RERUN_RE.search(ep["title"]):
+            sec = "rerun"  # reruns whose story differs from the original (e.g. added EX stories)
+        if (sec and e.get("6") and e.get("7") and not e.get("29")
+                and e["0"] not in ALBUM_DEFAULT and ep and ep["stages"] and sig(ep) not in taken):
+            taken.add(sig(ep))
+            album[sec].append({"key": e["1"], "title": ep["title"], "order": e["6"], "start": e["6"], "end": e["7"],
+                                   "banner": ep.get("banner"), "stages": ep["stages"], "notices": ep.get("notices", [])})
+    # an album entry also shows the preview novels of story-tree episodes that hold the same stories
+    by_novel = collections.defaultdict(list)
+    for ep in ep_by_id.values():
+        for n in ep.get("notices", []):
+            for st in ep["stages"]:
+                for k in st["novels"]:
+                    if n not in by_novel[k]:
+                        by_novel[k].append(n)
+    for v in album.values():
+        for x in v:
+            for st in x["stages"]:
+                for k in st["novels"]:
+                    for n in by_novel.get(k, []):
+                        if n not in x["notices"]:
+                            x["notices"].append(n)
     for v in album.values():
         v.sort(key=lambda x: -x["order"])
     json.dump(album, open(f"{WEB}/data/album.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     print("album", {k: len(v) for k, v in album.items()},
           "without banner", [x["title"] for v in album.values() for x in v if not x["banner"]])
-
-    # ---- the story tree lists each story once: rerun ("復刻") episodes with the same story are merged
-    # into the first, and episodes the album already holds become links to it. A rerun's <key>ex novels
-    # are the same story as <key> when the dialogue matches (416 identical, 16 differ only in staging).
-    def canon(k):
-        return k[:-2] if k.endswith("ex") and k[:-2] in lines and lines[k] == lines[k[:-2]] else k
-
-    def sig(ep):
-        return tuple(canon(k) for st in ep["stages"] for k in st["novels"])
 
     album_at = {}
     for sec, v in album.items():
@@ -398,11 +597,7 @@ def main():
             kept, first = [], {}
             for ep in ad["episodes"]:
                 sg = sig(ep)
-                if sg in album_at:
-                    sec, i = album_at[sg]
-                    links = ad.setdefault("album", [])
-                    if not any(l["sec"] == sec and l["i"] == i for l in links):
-                        links.append({"title": album[sec][i]["title"], "sec": sec, "i": i})
+                if sg in album_at:  # the album has it: leave it out of the story tree
                     linked += 1
                 elif sg in first:
                     first[sg]["reruns"] = first[sg].get("reruns", 0) + 1
@@ -411,17 +606,21 @@ def main():
                     first[sg] = ep
                     kept.append(ep)
             ad["episodes"] = kept
-        cats[c] = [ad for ad in ads if ad["episodes"] or ad.get("album")]
-    print("story tree: reruns merged", merged, "episodes moved to album links", linked)
+        cats[c] = [ad for ad in ads if ad["episodes"]]
+    cats = {c: ads for c, ads in cats.items() if ads}
+    print("story tree: reruns merged", merged, "episodes left to the album", linked)
     tree = [{"name": CATEGORY.get(c, f"その他 {c}"), "id": c, "adventures": v} for c, v in cats.items()]
 
+    elsewhere = {r.get("5") for r in table("characterPresentCharacterInfo")}  # shown on the character pages
     others = collections.defaultdict(list)
     for k in novels:
-        if k not in used:
+        if k not in used and k not in interaction and k not in elsewhere:
             g = re.sub(r"[_\d]+$", "", k.split(".", 1)[-1])
             g = re.sub(r"^(co\d*)_[bh]_touch_.*", r"\1_touch", g)
             others[g].append(k)
-    ui = {"menu1": find("files/offline/main_menu_bg01.png"), "menu2": find("files/offline/main_menu_bg02.png"),
+    # home tiles: the memorial app's menu art, else story CGs every client has (global data lacks files/offline/)
+    ui = {"menu1": find("files/offline/main_menu_bg01.png") or img.get("65010001"),
+          "menu2": find("files/offline/main_menu_bg02.png") or img.get("65010002"),
           "credits": find("files/movie/offline_credit.mp4"),
           "chars": find("files/character/lottery/gac_1011003022/all_rectangle.png"),
           "cards": find("files/character/lottery/gac_1011001027/status_l.png"),
@@ -432,6 +631,8 @@ def main():
               ensure_ascii=False, separators=(",", ":"))
     print("tree categories", len(tree), "novels in tree", len(used), "others", sum(len(v) for v in others.values()))
     build_movies(movie_refs, movie, novels)
+    global INTERACTION
+    INTERACTION = interaction
 
 
 
@@ -463,15 +664,30 @@ def main():
         if c.get("stories"):
             char_cost[code].append({"id": c["id"], "title": c["title"], "name": c["name"],
                                     "rarity": c["rarity"], "thumb": c["thumb"], "stories": c["stories"]})
+    voices = build_voices(chars_tbl)
+    # gift-event stories (e.g. the Valentine plan): characterPresentCharacterInfo f2 = character id, f5 = novel
+    code_of = {r["0"]: r["1"].split(".", 1)[1] for r in table("character")}
+    # titles from the event table (localised: プレゼントイベント / Present Event); the novels' own names are
+    # internal and stay Japanese even in the global data
+    pinfo = {r["0"]: r for r in table("characterPresentInfo")}
+    present = collections.defaultdict(list)
+    for r in table("characterPresentCharacterInfo"):
+        k, code = r.get("5"), code_of.get(r.get("2"))
+        if k and code and k in novels and k not in [x["key"] for x in present[code]]:
+            ev = pinfo.get(r.get("1"), {})
+            present[code].append({"key": k, "title": ev.get("1") or novels[k], "start": ev.get("2"), "end": ev.get("3")})
     characters = []
-    for code in sorted(set(char_cost) | set(char_story), key=lambda x: (corder.get(x, 9999), x)):
+    for code in sorted(set(char_cost) | set(char_story) | set(present) | (set(voices) & set(chars_tbl)), key=lambda x: (corder.get(x, 9999), x)):
         r = chars_tbl.get(code, {})
         cs = char_story.get(code, {})
         fc = first_card.get(code, {})
         characters.append({"code": code, "name": r.get("2", code), "short": r.get("3", code),
                            "img": fc.get("bust") or fc.get("thumb"),
                            "costumes": char_cost.get(code, []),
-                           "quest": cs.get("quest"), "fureai": cs.get("fureai")})
+                           "quest": cs.get("quest"), "fureai": cs.get("fureai"), "voices": len(voices.get(code, [])),
+                           "present": present.get(code, []),
+                           "profile": {k: r.get(f) for k, f in (("cv", "7"), ("race", "11"), ("title", "12"), ("age", "13"),
+                                                                ("height", "14"), ("desc", "5")) if r.get(f)}})
     json.dump(characters, open(f"{WEB}/data/characters.json", "w", encoding="utf-8"),
               ensure_ascii=False, separators=(",", ":"))
     print("character views", len(characters), "with costumes",

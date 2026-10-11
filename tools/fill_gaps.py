@@ -1,17 +1,21 @@
-"""Download offline-referenced-but-missing assets (and event-album banners) from the CDN.
+"""Download assets the stories (and the album, cards) use but no configured asset root has, from the CDN.
 
-md5/path source: the JP offline app's own manifests (cdn/project.manifest*) first, then other app
-data's manifests (en/man/p*.manifest and those inside configured asset roots) for files the JP ones
-don't list — global copies of JP files carry English text.
-The set of files is driven by what the OFFLINE data references (novels + master) plus the album folders.
-Files the JP APK or any other configured asset root (e.g. an app-data backup) already has are never
-downloaded, and a copy in assets/ that would shadow the APK's own version is removed.
-Resumable (skips files already present with the right md5), parallel.
-Old JP online builds' manifests (cdn/legacy/<version>/, see tools/legacy_manifests.py) rank after the
-memorial app's and before the global ones; story CGs already on disk are kept (re-encodes only).
-JP data also gets the official Japanese gacha name plates and line images — from those manifests, else from an early
-(2017-07) pre-md5 snapshot — stored as files/lottery/{name_jp,text_jp}/<id>.png so they never mix
-with the global client's English ones (files/lottery/{name,text}/).
+md5/path sources, all from config.json and in this order: the setup's own manifests ("manifests", default
+the memorial app's cdn/project.manifest*), old JP online builds' manifests ("legacy_manifests", see
+tools/legacy_manifests.py; newest build first), the manifests an app-data backup ships inside its asset
+roots (contents/N/project.manifest, contents/1/manifests/*), and only if you list them, another region's
+manifests ("fallback_manifests" — their files may carry that region's language). Nothing else in the
+project is read, so a Japanese setup never picks up global files and vice versa.
+The set of files is driven by what the built data references (novels, album folders) plus the cards and
+the gacha reveal (art, cuts, opening movies — converted to .mp4 via usm.py — and gacha-hit voices), and
+the event-voice zips of episodes no root has unpacked (unpacked into files/sound/voice_episode/), and the
+home/town/system voices shown on the character pages.
+Files any other configured asset root already has are never downloaded, and a download that would shadow
+a different copy in another root is removed. Story CGs already on disk are kept (other builds only
+re-encode them). Resumable (skips files already present with the right md5), parallel.
+JP data also gets the official Japanese gacha name plates and line images — from the legacy manifests,
+else from an early (2017-07) pre-md5 snapshot — stored as files/lottery/{name_jp,text_jp}/<id>.png so they
+never mix with the global client's English ones (files/lottery/{name,text}/).
 Usage: python tools/fill_gaps.py [--dry]
 """
 import glob
@@ -24,13 +28,12 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config
 
 CFG = config.load()
-ASSETS = os.path.join(ROOT, "assets")  # downloads go here; keep it in config.json's asset_roots
-# every other configured asset root counts as "already have it" (an app-data backup, the APK, ...)
+ASSETS = CFG["downloads"]  # downloads go here; keep it in config.json's asset_roots
+# every other configured asset root counts as "already have it" (the APK, an app-data backup, ...)
 OTHER_ROOTS = [r for r in CFG["asset_roots"] if os.path.abspath(r) != os.path.abspath(ASSETS)]
 CDN = "https://cdn-danmemo.akamaized.net/"
 DRY = "--dry" in sys.argv
@@ -40,18 +43,6 @@ LEGACY = CDN + "cc73f149fe44ec2287359e6b7f4e2c1e5fdb7b03/contents/"
 
 def man_table(name):
     return json.load(open(f"{CFG['dec']}/master/{name}.json", encoding="utf-8"))["0"]
-
-
-APK_ROOTS = [f"{ROOT}/x/pack/assets", f"{ROOT}/x/base/assets/common"]
-
-# full manifest: key -> {md5, path, size}; JP entries win over EN; + basename index + prefix helper
-MAN = {}
-for f in sorted(glob.glob(f"{ROOT}/cdn/project.manifest*")):
-    try:
-        MAN.update(json.load(open(f))["assets"])
-    except (ValueError, KeyError):
-        pass
-JP_KEYS = set(MAN)
 
 
 def manifest_entries(path):
@@ -71,27 +62,29 @@ def manifest_entries(path):
     return out
 
 
-# then other app data's manifests: en/man/ and any shipped inside a configured asset root (an app-data
-# backup keeps contents/N/project.manifest and contents/1/manifests/*.manifest)
-# old JP online manifests (pre-md5 builds such as 8.2.0, fetched by tools/legacy_manifests.py into
-# cdn/legacy/<version>/) come before the global ones: Japanese text beats English. Newest build first.
+def _files(patterns):
+    return [f for p in patterns for f in sorted(glob.glob(p)) if os.path.isfile(f)]
+
+
 def _ver(d):
     return [int(x) if x.isdigit() else 0 for x in os.path.basename(d).split(".")]
 
 
-LEGACY_MAN = {}
-for d in sorted(glob.glob(f"{ROOT}/cdn/legacy/*/"), key=lambda d: _ver(d.rstrip("/")), reverse=True):
+# full manifest: key -> {md5, path, size}; earlier sources win
+MAN, OWN, LEGACY_MAN = {}, {}, {}
+for f in _files(CFG["manifests"]):
+    for k, v in manifest_entries(f).items():
+        OWN.setdefault(k, v)
+for d in sorted(glob.glob(os.path.join(CFG["legacy_manifests"], "*", "")), key=lambda d: _ver(d.rstrip("/")), reverse=True):
     for f in sorted(glob.glob(d + "*.manifest*")):
         for k, v in manifest_entries(f).items():
             LEGACY_MAN.setdefault(k, v)
-for k, v in LEGACY_MAN.items():
-    MAN.setdefault(k, v)
-extra = glob.glob(f"{ROOT}/en/man/p*.manifest")
-for r in CFG["asset_roots"]:
-    extra += glob.glob(os.path.join(r, "project.manifest")) + glob.glob(os.path.join(r, "manifests", "*.manifest"))
-for f in extra:
-    for k, v in manifest_entries(f).items():
+BACKUP = _files([os.path.join(r, "project.manifest") for r in CFG["asset_roots"]]
+                + [os.path.join(r, "manifests", "*.manifest") for r in CFG["asset_roots"]])
+for src in [OWN, LEGACY_MAN] + [manifest_entries(f) for f in BACKUP + _files(CFG["fallback_manifests"])]:
+    for k, v in src.items():
         MAN.setdefault(k, v)
+FALLBACK_KEYS = set(MAN) - set(OWN) - set(LEGACY_MAN) - {k for f in BACKUP for k in manifest_entries(f)}
 BYBASE = {}
 for k in MAN:
     BYBASE.setdefault(os.path.basename(k).rsplit(".", 1)[0], []).append(k)
@@ -162,11 +155,79 @@ def collect():
     if not any(r.get("29") for r in man_table("adventureEpisode")):
         under(t, "files/lottery/name/")
         under(t, "files/lottery/text/")  # gacha lines (images) for the moji cut
+    # 4) cards and the gacha reveal (the memorial app has no gacha: card art, reveal cuts, opening movies and
+    #    gacha-hit voices only exist in the online builds' manifests)
+    for r in man_table("pc"):
+        cid = r["0"]
+        for f in ("lottery", "white", "all_rectangle", "bustup_s", "status_l", "thumbnail_gacha"):
+            add(t, f"files/character/lottery/gac_{cid}/{f}.png")
+        under(t, f"files/lwf/lotteryLwf/lwf_lottery_ef_{cid}/")
+        if r.get("75"):  # gacha-hit voice
+            for mk in BYBASE.get("voice_" + r["75"].split(".", 1)[1], []):
+                add(t, mk)
+    under(t, "files/lwf/uiLwf/lottery/")
+    for n in (2, 3, 4):
+        add(t, f"files/movie/argo_gacha_op_0{n}.usm")
+    # 6) home / town / system voices of the character pages (touch, greetings, alarm, login, costume change,
+    #    title calls); many have no text in the memorial data and only exist in an old build's manifest
+    vre = re.compile(r"voice_(?:co\d*_(?:[hb]_touch|[dmn]_greet|talk|hold|change)|reaction|sys\d*_town|"
+                     r"sys_(?:alarm|login|title|st|fr|pre)|gen)_")
+    for k in MAN:
+        if k.startswith("files/sound/voice/") and vre.match(os.path.basename(k)):
+            add(t, k)
+    # 5) event voices come as one zip per episode; fetch the ones no root has unpacked
+    for k in MAN:
+        if k.startswith("files/sound/voice_episode_zip/") and k.endswith(".zip"):
+            if not voices_unpacked(os.path.basename(k)[:-4]):
+                add(t, k)
     return t
 
 
+def voices_unpacked(eid):
+    return any(os.path.isdir(os.path.join(r, "files", "sound", "voice_episode", eid)) for r in CFG["asset_roots"])
+
+
+def unzip_voices():
+    """Unpack downloaded event-voice zips into files/sound/voice_episode/<episode>/ (where the player looks)."""
+    import zipfile
+    out = os.path.realpath(os.path.join(ASSETS, "files", "sound", "voice_episode"))
+    done = 0
+    for z in sorted(glob.glob(os.path.join(ASSETS, "files", "sound", "voice_episode_zip", "*.zip"))):
+        if voices_unpacked(os.path.basename(z)[:-4]):
+            continue
+        if DRY:
+            print("  would unpack", os.path.basename(z))
+            continue
+        with zipfile.ZipFile(z) as zf:
+            for m in zf.namelist():
+                dst = os.path.realpath(os.path.join(out, m))
+                if not dst.startswith(out + os.sep):  # never write outside the voice folder
+                    raise SystemExit(f"unsafe path in {z}: {m}")
+            zf.extractall(out)
+        done += 1
+    return done
+
+
+def convert_movies():
+    """Turn downloaded .usm cutscenes into the .mp4 the player uses (tools/usm.py, needs ffmpeg)."""
+    import subprocess
+    done = 0
+    for usm in glob.glob(os.path.join(ASSETS, "files", "movie", "*.usm")):
+        mp4 = usm[:-4] + ".mp4"
+        if os.path.exists(mp4) or any(os.path.exists(os.path.join(r, "files", "movie", os.path.basename(mp4))) for r in OTHER_ROOTS):
+            continue
+        if DRY:
+            print("  would convert", os.path.basename(usm))
+            continue
+        res = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "usm.py"), usm, mp4],
+                             capture_output=True, text=True)
+        done += res.returncode == 0 and os.path.exists(mp4)
+    return done
+
+
 def in_apk(key):
-    return next((p for p in (os.path.join(r, key) for r in APK_ROOTS) if os.path.exists(p)), None)
+    """The copy another configured root (the APK, a backup) has of this file, if any."""
+    return next((p for p in (os.path.join(r, key) for r in OTHER_ROOTS) if os.path.exists(p)), None)
 
 
 def elsewhere(key):
@@ -178,16 +239,17 @@ def md5_of(path):
 
 
 def unshadow():
-    """Remove assets/ copies that differ from the file the JP APK bundles (they'd win in asset lookup)."""
+    """Remove downloaded copies that differ from the file another configured root (the APK, a backup)
+    has — the download root comes first in asset lookup, so they would hide the user's own copy."""
     removed = 0
-    for dp, _, fs in os.walk(f"{ROOT}/assets/files"):
+    for dp, _, fs in os.walk(f"{ASSETS}/files"):
         for fn in fs:
             p = os.path.join(dp, fn)
-            apk = in_apk(os.path.relpath(p, f"{ROOT}/assets"))
+            apk = in_apk(os.path.relpath(p, f"{ASSETS}"))
             if apk and md5_of(p) != md5_of(apk):
                 removed += 1
                 if DRY:
-                    print("  would remove shadowing copy", os.path.relpath(p, ROOT))
+                    print("  would remove shadowing copy", os.path.relpath(p, ASSETS))
                 else:
                     os.remove(p)
     return removed
@@ -195,7 +257,7 @@ def unshadow():
 
 def fetch(key):
     info = MAN[key]
-    dst = f"{ROOT}/assets/{key}"
+    dst = f"{ASSETS}/{key}"
     if in_apk(key) or elsewhere(key):
         return ("have", key)
     if os.path.exists(dst) and os.path.getsize(dst) == info["size"] and md5_of(dst) == info["md5"]:
@@ -236,7 +298,7 @@ def legacy_plates():
         kind, cid = job
         sub, (w, h) = LEGACY_LOTTERY[kind]
         rel = f"files/lottery/{sub}/{cid}.png"
-        dst = f"{ROOT}/assets/{rel}"
+        dst = f"{ASSETS}/{rel}"
         if os.path.exists(dst) or elsewhere(rel):
             return kind, "have"
         info = LEGACY_MAN.get(f"files/lottery/{kind}/{cid}.png")
@@ -283,7 +345,11 @@ def main():
                 print(f"  {done}/{len(targets)}  {dict(r)}", flush=True)
     print("DONE", dict(r), flush=True)
     print(f"ok={r['ok']} skip={r['skip']} have={r['have']} badmd5={r['badmd5']} fail={r['fail']} would={r['would']}", flush=True)
-    print("from JP manifest:", sum(k in JP_KEYS for k in targets), "EN-only:", sum(k not in JP_KEYS for k in targets))
+    src = lambda k: "own" if k in OWN else "legacy" if k in LEGACY_MAN else "fallback" if k in FALLBACK_KEYS else "backup"
+    import collections as _c
+    print("targets by manifest:", dict(_c.Counter(src(k) for k in targets)))
+    print("unpacked event-voice zips:", unzip_voices(), flush=True)
+    print("converted movies:", convert_movies(), flush=True)
     if any(r.get("29") for r in man_table("adventureEpisode")):  # JP memorial data
         legacy_plates()
 
