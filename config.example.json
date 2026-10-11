@@ -1,0 +1,26 @@
+{
+  "_comment": "Copy to config.json. Paths are relative to the project root. Earlier entries win when the same file exists in several places.",
+
+  "libapp": "x/lib/lib/arm64-v8a/libapp.so",
+
+  "novel_dirs": [
+    "x/pack/assets/master/divide_novel_command_enc"
+  ],
+  "master_dirs": [
+    "x/base/assets/common/master/divide_enc"
+  ],
+
+  "asset_roots": [
+    "assets",
+    "x/pack/assets",
+    "x/base/assets/common"
+  ],
+
+  "translations": {
+    "en": {
+      "_comment": "Optional: an English (global) app-data dump, e.g. contents/1/master/...",
+      "novel_dirs": ["en/novel"],
+      "master_dirs": ["en/master"]
+    }
+  }
+}

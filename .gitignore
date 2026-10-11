@@ -1,0 +1,38 @@
+# ---- Game resources and anything derived from them: never publish (copyright) ----
+apk/
+x/
+tw/
+en/
+cdn/
+assets/
+dec/
+dec_*/
+dump/
+wayback/
+keys.json
+web/data/
+web/r/
+*.apk
+*.xapk
+*.enc
+*.usm
+*.manifest
+
+# screenshots / captures of the game and notes that quote game text
+cap/
+ref/
+screenshot*.png
+web/vmshot.png
+web/affected_novels.md
+
+# local debugging helpers (hard-coded LAN address)
+web/lwftest.html
+tools/diagsrv.py
+
+# ---- local tooling ----
+venv/
+platform-tools/
+__pycache__/
+*.pyc
+config.json
+androguard.db
