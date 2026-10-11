@@ -399,6 +399,8 @@ def main():
             while args and args[-1] == "":
                 args.pop()
             out.append([c["2"]] + args)
+            if c["2"] == 8 and len(args) > 4 and f"manpu.{args[4]}" not in res:  # emotion mark icon
+                res[f"manpu.{args[4]}"] = find(f"files/icon/novel/manpu_{args[4]}.png")
             for a in args:
                 for tok in re.split(r"[\s,]+", a):
                     if tok.startswith("movie_usm.") and (nid, key) not in movie_refs[tok]:
@@ -556,6 +558,7 @@ def main():
     # whose story no album entry holds yet (reruns with changed content get their own tab; newest first)
     adv_cat = {a0["0"]: a0.get("2") for a0 in table("adventure")}
     taken = {sig(x) for sec in ("anniversary", "event") for x in album[sec]}
+    absorbed = collections.defaultdict(list)  # album entry -> signatures of episodes merged into it
     for e in sorted(episodes, key=lambda e: (e.get("6") or 0, e["0"])):
         ep = ep_by_id.get(e["0"])
         sec = next((k for k, cs in EXTRA_ALBUM.items() if adv_cat.get(e.get("2")) in cs), None)
@@ -563,6 +566,16 @@ def main():
             sec = "rerun"  # reruns whose story differs from the original (e.g. added EX stories)
         if (sec and e.get("6") and e.get("7") and not e.get("29")
                 and e["0"] not in ALBUM_DEFAULT and ep and ep["stages"] and sig(ep) not in taken):
+            # a later phase of an event the album already has (same title, same story series, e.g. the
+            # raid finale of グランド・デイ): append its stages to that entry instead of a new one
+            series = {re.sub(r"_\d+(ex)?$", "", k) for st in ep["stages"] for k in st["novels"]}
+            host = next((x for v in album.values() for x in v if x["title"] == ep["title"]
+                         and series & {re.sub(r"_\d+(ex)?$", "", k) for st in x["stages"] for k in st["novels"]}), None)
+            if host:
+                absorbed[id(host)] += [sig(host), sig(ep)]  # the story tree still knows both halves
+                host["stages"] = host["stages"] + [st for st in ep["stages"] if st not in host["stages"]]
+                taken.add(sig(ep))
+                continue
             taken.add(sig(ep))
             album[sec].append({"key": e["1"], "title": ep["title"], "order": e["6"], "start": e["6"], "end": e["7"],
                                    "banner": ep.get("banner"), "stages": ep["stages"], "notices": ep.get("notices", [])})
@@ -590,7 +603,8 @@ def main():
     album_at = {}
     for sec, v in album.items():
         for i, x in enumerate(v):
-            album_at.setdefault(sig(x), (sec, i))
+            for sg in [sig(x)] + absorbed.get(id(x), []):
+                album_at.setdefault(sg, (sec, i))
     merged = linked = 0
     for c, ads in cats.items():
         for ad in ads:

@@ -34,7 +34,7 @@ for p in $(adb shell pm path com.danmemo | sed 's/package://'); do adb pull "$p"
 ```
 
 取得 7 個檔案，重要的是：
-- `base.apk`（140 MB）：`assets/common/master/divide_enc/*.enc`（主資料）、`assets/lua/*.enc`
+- `base.apk`（140 MB）：`assets/common/master/divide_enc/*.enc`（主資料）、`assets/lua/*.enc`（26 個共用與戰鬥技能腳本，沒有劇情、演出或抽卡台詞，播放器不需要；劇情指令實作在 `libapp.so`）
 - `split_install_pack.apk`（370 MB）：`assets/master/divide_novel_command_enc/novelCommand*.enc`（**劇情腳本，11,462 個**）、`assets/files/`（立繪、背景、UI、音效）
 - `split_config.arm64_v8a.apk`：`lib/arm64-v8a/libapp.so`（遊戲本體，37 MB）
 
@@ -231,45 +231,49 @@ remoteManifestUrl: {}/manifests/jp/png/project.manifest.1/0880e4f102c7a71c775762
 | 4 | EffectShow | lwf, x, y, wait/no_wait, fade, 淡入秒, 旋轉 | ✔ 場景特效；持續到 53、淡出（19）或播完變空白（dagger/graywind 等一次性特效）。重發同名特效會取代已播完停住的舊實體 |
 | 5 | CharacterSet | 立繪, 表情, 位置(left_end/left/center/right/right_end) | ✔ 先放好但不顯示；**重設縮放**（2,391 次是在特寫放大中直接重設，原作顯示正常大小） |
 | 6 / 7 | CharacterShow / Hide | 立繪…(最多 3 個), 轉場(fade/slide/immediately), 秒 | ✔ |
-| 8 | CharacterAction | 立繪, dx, dy, ?, 情緒符號, over | ✘（情緒氣泡素材未對應） |
+| 8 | **漫符**（情緒符號） | 立繪, dx, dy, ?, 符號(exclamation/puzzle/question/angry/bad/shine/bellow/talk), over | ✔ 在臉部附近疊 `files/icon/novel/manpu_<符號>.png`，跳出後淡出。最初誤當成換表情加移動，角色會被永久移位 |
 | 9 | CharacterAction（hop） | 立繪, , hop | ✔ 跳動 |
 | 10 | CharacterFocus | 立繪, on/off/auto | ✔ 非說話者變暗 |
 | 11 | TalkShowWait | 立繪, 表情, ?, 視窗位置, 語音, 名字, 文字 | ✔ 等點擊 |
 | 12 | TalkShow | 同 11 | ✔ 不等點擊（自動播放段落） |
-| 14 | TalkSelectionShow | A 文字, 秒, B 文字, 秒, 語音(空白分隔), 名字, A/B 合併文字 | ✔ 選項 |
+| 14 | TalkSelectionShow | A 文字, **A 分支指令數**, B 文字, **B 分支指令數**, 語音(空白分隔), 名字 | ✔ 只播選中的分支（B 的文字在 +A 的位置 451/491 次）；分支第一句已是選項原文時不再重講。最初兩個分支都播 |
 | 15 | TimeDelay | 秒 | ✔ |
-| 16 | QuakeStart | 對象(all/background/character/立繪), ?, 幅度, ?, 秒 | ✔ |
+| 16 | QuakeStart | 對象(all/background/character/image), 立繪/圖, **X 幅度, Y 幅度**, 秒 | ✔（Y 幅度原本被忽略，X 為 0 時完全不震） |
 | 17 | MovieStartWait | movie_usm, skip_enable… | △ 需先把 USM 轉成 MP4 |
 | 18 | SeStart | se, 延遲 | ✔ |
-| 19 / 20 | ScreenChangeFadeOut / FadeIn | 秒 | ✔ 淡出後**整個場景重置**：清掉場景特效、角色、中景／前景圖、旁白（保留背景）。4,516 個特效從未被關閉、而後都接著淡出；23k 次角色在淡出後不再出現或被重新設定 |
+| 19 / 20 | ScreenChangeFadeOut / FadeIn | 秒, **顏色**（ffffff ×1,284 = 白畫面轉場） | ✔ 淡出後**整個場景重置**：清掉場景特效、角色、中景／前景圖、旁白（保留背景）。4,516 個特效從未被關閉、而後都接著淡出；23k 次角色在淡出後不再出現或被重新設定 |
 | 21 | TitleShow | 標題, 副標題 | ✔ 標題卡 |
 | 22 / 31 | BgmStart / BgmChangeDefault | bgm, 淡入秒 | ✔ |
-| 23 / 24 / 25 | ImageMove / Scale / Rotate | 圖, x, y / 倍率 / … , 秒 | ✔ 不阻塞（和後續指令同時進行的鏡頭移動） |
-| 27 | CharacterMove | 立繪, x, y, 秒, relative/absolute | ✔ |
+| 23 / 24 / 25 | ImageMove / Scale / Rotate | 圖, x, y / 倍率 / … , 秒, 緩動曲線 | ✔ 不阻塞（和後續指令同時進行的鏡頭移動） |
+| 27 | CharacterMove | 立繪, x, y, 秒, relative/absolute, **緩動曲線**（easeOutCubic 2,571、easeInCubic 1,569、easeInOutCirc 901、liner…） | ✔ 曲線換成 cubic-bezier，沒寫或 liner 為線性 |
 | 29 | TalkClose | 秒 | ✔ 同時淡出旁白文字 |
 | 30 | BgmStop | 淡出秒 | ✔ |
-| 32 / 52 | ScreenFlush | 色, 圖層, 入, 停, 出 | ✔ 閃光 |
-| 33 / 42 | SeLoopStart / SeLoopStop | se, 音量, 淡入 | ✔ |
-| 36 | CharacterAppear | 立繪, 表情, x 或 (起點 x, 終點 x, 秒) | ✔ 可滑入 |
-| 37 | VolumeSet | bgm, 音量, 秒 | ✔ |
-| 38 | （受傷震動） | 立繪, 強度 | △ 用震動代替 |
+| 32 / 52 | ScreenFlush | 色, 圖層, 入, 停, 出, no_wait/wait | ✔ 閃光（32 的 no_wait 不阻塞） |
+| 33 | **SeStop** | se, 延遲, 淡出秒 | ✔ 停止 18 播的音效（3,398/3,398 次都在同一篇稍早用 18 播過）。最初誤判為「開始循環」，音效停不下來 |
+| 42 | （全部音效停止？） | 秒 | △ 4 次，未確認 |
+| 36 | CharacterAppear | 立繪, 表情, x 或 (起點 x, 終點 x, 秒), **淡入秒** | ✔ 可滑入；淡入秒（6,252/12,027 次）原本被忽略，角色會瞬間冒出 |
+| 37 | VolumeSet | bgm 或 se, 音量, 秒 | ✔（對 se 的 512 次原本沒處理） |
+| 38 | **CharacterZOrder** | 立繪, 前後值(±50、100…) | ✔ 最初誤當成震動 |
 | 39 | CharacterFace | 立繪, 表情 | ✔ |
 | 40 | ImageSet | 圖 | ✔ 預載並重設位置 |
 | 67 | ImageRemove | 圖 | ✔ 立即移除（常接在 2 之後） |
-| 41 | CharacterScale | 立繪, 倍率, 秒 | ✔ |
+| 41 | CharacterScale | 立繪, 倍率, 秒, 緩動曲線 | ✔ |
+| 49 | **CharacterRotate** | 立繪, 角度, 秒 | ✔（原本沒實作） |
 | 44 | DescriptiveShow | 色, 透明度, 秒 | ✔ 旁白遮罩 |
 | 45 | DescriptiveText | 色, 轉場, 位置, 秒, 語音, 字級, 文字 | ✔ 旁白 |
-| 50 | ScreenChangeFadeTo | 色, 圖層, 透明度, 秒, wait | ✔ |
+| 50 / 51 | ScreenChangeFadeTo / 解除 | 50：色, 圖層, **秒, 透明度**, wait；51：秒, wait | ✔ 獨立的色罩（不和 19/20 共用）；50 的秒數和透明度原本弄反，51 原本只是暫停 |
 | 53 | **EffectHide** | lwf, , fade/immediately, 秒, wait | ✔ 關閉 4 開的特效（1,413/1,434 次緊接在同名 4 之後）。最初誤判為顯示，集中線等特效一直留在畫面上 |
 | 54 / 55 / 56 | LwfSet / LwfShow / LwfHide | lwf, 實例名, x, y / LWF, 秒, wait | ✔ |
-| 58 | LwfHide（依實例名） | lwf, 實例名, 秒 | ✔ |
-| 59 / 68 | LwfRotate / LwfMove | … | ✔ |
-| 57 / 69 / 70 | LwfFlip / LwfZOrder / LwfParent | | ✘ |
-| 60–63 | AnimationText Set/Show/Move/Remove | id, 座標, 色, 字級, 文字 | ✔ 字幕、片尾名單捲動 |
-| 64 / 65 / 66 | PostEffectGroupSet / Start / End | 圖層(background/middle/background_middle/…_effect/all) / 類型 | ✔ blur、color_multiplier、custom_color_correction（SVG 矩陣）、sepia、grayscale；✘ gradient_multiplier（210 次）、rim_light（161 次） |
+| 58 | **LwfScale** | lwf, 實例名, 倍率 | ✔ 夾在同實例的 54 和 55 之間（930+175 次）。最初誤判為隱藏，會刪掉剛設定的特效、再在中央重建 |
+| 59 / 68 | LwfRotate / LwfMove | … / lwf, 實例, x, y, 秒, relative, 緩動曲線 | ✔ |
+| 57 / 69 / 70 | LwfFlip / LwfZOrder / LwfParent | 翻轉 X/Y / 前後值（負值在角色後方）/ add, image\|chara, 對象 | ✔ 改成設定特效屬性（原本都在中央重建一個實例） |
+| 60–63 | AnimationText Set/Show/Move/Remove | id, 座標, 錨點, **對齊**(center/left/right), 色, 字級, 文字 | ✔ 字幕、片尾名單捲動 |
+| 64 / 65 / 66 | PostEffectGroupSet / Start / End | 圖層(background/middle/background_middle/…_effect/all), **指定立繪**… / 類型 | ✔ blur、color_multiplier、custom_color_correction（SVG 矩陣）、sepia、grayscale；✘ gradient_multiplier（210 次）、rim_light（161 次） |
 | 71 / 74 | BattleSimulate / CompleteMission | | 忽略 |
 
 文字標記只有振假名一種：`[r=よみ]漢字[/r]`。
+
+**參數稽核（2026-10-12）**：對全部劇情統計每個指令每個參數位置的出現比例和常見值，再對照播放器實際讀的參數，找出上表標粗體的那些（資料裡有、播放器沒讀或讀錯）。還沒處理、需要原作錄影確認的：45 旁白可能是整段淡入（a[3] 秒）而不是逐字；1 的 a[4] 可能是「不等淡入結束」；50／32／44 的圖層參數（色罩在角色下或上）；52、57、42 的部分參數；65 的過渡秒數與 gradient_multiplier、rim_light。少數 LWF 實例共用資源時，函式庫內部會丟出 `z$Wa` 錯誤（2 篇，劇情可播完）。
 
 ## 9. 網頁播放器
 

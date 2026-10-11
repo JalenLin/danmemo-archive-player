@@ -24,6 +24,26 @@ function units(s) {
 }
 
 const FRAME = 1000 / 30;  // ms per command in the original engine
+// Easing names the scripts pass to moves / zooms (27 a[5], 41 a[3], 23/24/25, 68 a[6]); 'liner' and an empty
+// value are linear. CSS curves for Web Animations, functions for the rAF-driven LWF moves.
+const EASE_BEZIER = {
+  easeInSine: [0.12, 0, 0.39, 0], easeOutSine: [0.61, 1, 0.88, 1], easeInOutSine: [0.37, 0, 0.63, 1],
+  easeInQuad: [0.11, 0, 0.5, 0], easeOutQuad: [0.5, 1, 0.89, 1], easeInOutQuad: [0.45, 0, 0.55, 1],
+  easeInCubic: [0.32, 0, 0.67, 0], easeOutCubic: [0.33, 1, 0.68, 1], easeInOutCubic: [0.65, 0, 0.35, 1],
+  easeInQuart: [0.5, 0, 0.75, 0], easeOutQuart: [0.25, 1, 0.5, 1], easeInOutQuart: [0.76, 0, 0.24, 1],
+  easeInQuint: [0.64, 0, 0.78, 0], easeOutQuint: [0.22, 1, 0.36, 1], easeInOutQuint: [0.83, 0, 0.17, 1],
+  easeInExpo: [0.7, 0, 0.84, 0], easeOutExpo: [0.16, 1, 0.3, 1], easeInOutExpo: [0.87, 0, 0.13, 1],
+  easeInCirc: [0.55, 0, 1, 0.45], easeOutCirc: [0, 0.55, 0.45, 1], easeInOutCirc: [0.85, 0, 0.15, 1],
+  easeInBack: [0.36, 0, 0.66, -0.56], easeOutBack: [0.34, 1.56, 0.64, 1], easeInOutBack: [0.68, -0.6, 0.32, 1.6],
+};
+const isEase = (v) => typeof v === 'string' && (v in EASE_BEZIER || v === 'liner' || v === 'linear');
+const cssEase = (v) => (EASE_BEZIER[v] ? `cubic-bezier(${EASE_BEZIER[v].join(',')})` : 'linear');
+function easeFn(v) {  // the same curves as functions of t in [0,1]
+  const b = EASE_BEZIER[v];
+  if (!b) return (t) => t;
+  const [x1, y1, x2, y2] = b, B = (a1, a2, t) => 3 * a1 * t * (1 - t) ** 2 + 3 * a2 * t * t * (1 - t) + t ** 3;
+  return (x) => { let lo = 0, hi = 1; for (let i = 0; i < 20; i++) { const m = (lo + hi) / 2; if (B(x1, x2, m) < x) lo = m; else hi = m; } return B(y1, y2, (lo + hi) / 2); };
+}
 export const SKIP_DELAY = 120;  // default ms per line while skipping (user-adjustable)
 // true when an effect canvas has nothing visible left (sampled)
 function lwfBlank(c) {
@@ -48,6 +68,7 @@ export class Player {
         <div class="msg hidden"><div class="msg-name"></div><div class="msg-text"></div><div class="msg-next">▼</div></div>
         <div class="titlecard hidden"><div class="tc-sub"></div><div class="tc-title"></div></div>
         <div class="choice hidden"></div>
+        <div class="tint"></div>
         <div class="fade"></div>
         <video class="movie hidden" playsinline></video>
       </div>
@@ -62,6 +83,7 @@ export class Player {
     this.descBg = root.querySelector('.desc-bg');
     this.descText = root.querySelector('.desc-text');
     this.fadeEl = root.querySelector('.fade');
+    this.tintEl = root.querySelector('.tint');  // 50 ScreenChangeFadeTo / 51 its release — separate from 19/20
     this.titleEl = root.querySelector('.titlecard');
     this.choiceEl = root.querySelector('.choice');
     this.atext = root.querySelector('.atext');
@@ -87,10 +109,10 @@ export class Player {
       this._last = t;
       for (const f of this.fx.values()) {
         if (f.tw) {
-          const k = Math.min(1, (t - f.tw.t0) / f.tw.ms);
+          const p = Math.min(1, (t - f.tw.t0) / f.tw.ms), k = f.tw.ease(p);
           f.x = f.tw.x0 + (f.tw.x1 - f.tw.x0) * k; f.y = f.tw.y0 + (f.tw.y1 - f.tw.y0) * k;
           this.lwfPlace(f);
-          if (k >= 1) f.tw = null;
+          if (p >= 1) f.tw = null;
         }
         try { f.lwf.exec(dt); f.lwf.render(); } catch (e) { /* ignore broken effect */ }
       }
@@ -142,8 +164,8 @@ export class Player {
     this._ro.disconnect();
   }
   stopAudio() {
-    for (const a of [this.bgm, this.voice, ...(this.loops || [])]) if (a) { a.pause(); a.src = ''; }
-    this.bgm = null; this.loops = [];
+    for (const a of [this.bgm, this.voice, ...(this.loops || []), ...(this.ses || []).map((x) => x.a)]) if (a) { a.pause(); a.src = ''; }
+    this.bgm = null; this.loops = []; this.ses = [];
   }
 
   res(key) { return this.novel.res[key]; }
@@ -155,10 +177,14 @@ export class Player {
     this.images = {};
     this.chars = {};
     this.loops = [];
+    this.ses = this.ses || [];  // SEs still sounding carry over into the next story of a run
     this.peTarget = 'background';
     const cmds = novel.cmds;
+    this.jumps = [];  // after a chosen branch A, skip branch B: [{ at: first B command, n: its length }]
     for (this.pc = 0; this.pc < cmds.length; this.pc++) {
       if (this.stopped) return false;
+      for (let j; (j = this.jumps.findIndex((x) => x.at === this.pc)) >= 0;) { this.pc += this.jumps[j].n; this.jumps.splice(j, 1); }
+      if (this.pc >= cmds.length) break;
       const t0 = performance.now();
       try { await this.exec(cmds[this.pc]); } catch (e) { console.warn('cmd failed', cmds[this.pc], e); }
       // the original engine runs one command per 30fps frame: rapid-fire sequences (e.g. 30 dagger
@@ -180,9 +206,9 @@ export class Player {
       case 40: this.imageState(a[0], true); return;
       case 67: return this.imageHide(a[0], 0);
       // image pans/zooms run alongside the following commands (slow camera moves)
-      case 23: { const s = this.imageState(a[0]), r = a[4] === 'relative'; this.imageXform(a[0], { x: (r ? s.x : 0) + num(a[1]), y: (r ? s.y : 0) + num(a[2]) }, num(a[3])); return; }
-      case 24: this.imageXform(a[0], { s: num(a[1], 1) }, num(a[2])); return;
-      case 25: this.imageXform(a[0], { r: num(a[3]) }, num(a[4])); return;
+      case 23: { const s = this.imageState(a[0]), r = a[4] === 'relative'; this.imageXform(a[0], { x: (r ? s.x : 0) + num(a[1]), y: (r ? s.y : 0) + num(a[2]) }, num(a[3]), a.slice(4).find(isEase)); return; }
+      case 24: this.imageXform(a[0], { s: num(a[1], 1) }, num(a[2]), a.slice(3).find(isEase)); return;
+      case 25: this.imageXform(a[0], { r: num(a[3]) }, num(a[4]), a.slice(5).find(isEase)); return;
 
       case 5: return this.charSet(a[0], a[1], POS[a[2]] ?? 640);
       case 36: return this.charAppear(a);
@@ -190,12 +216,13 @@ export class Player {
       case 7: return this.charShowHide(a, false);
       case 39: return this.charFace(a[0], a[1]);
       case 10: return this.charFocus(a[0], a[1]);
-      case 27: return this.charMove(a[0], num(a[1]), num(a[2]), num(a[3]), a[4] !== 'absolute');
+      case 27: return this.charMove(a[0], num(a[1]), num(a[2]), num(a[3]), a[4] !== 'absolute', cssEase(a[5]));
       // reaction nudge: change face and jolt the portrait by (x,y) with an overshoot bounce
-      case 8: this.charFace(a[0], a[4]); return this.charMove(a[0], num(a[1]), num(a[2]), 0.35, true, 'cubic-bezier(.34,1.56,.64,1)');
-      case 41: return this.charScale(a[0], num(a[1], 1), num(a[2]));
+      case 8: return this.manpu(a[0], num(a[1]), num(a[2]), a[4]);  // emotion mark [portrait, dx, dy, ?, mark, over]
+      case 41: return this.charScale(a[0], num(a[1], 1), num(a[2]), cssEase(a[3]));
       case 9: return this.charHop(a[0]);
-      case 38: return this.quake('character/' + a[0], 8, 0.3);
+      case 38: { const st = this.charState(a[0]); st.el.style.zIndex = String(1000 + Math.round(num(a[1]))); return; }  // CharacterZOrder
+      case 49: return this.charRotate(a[0], num(a[1]), num(a[2]));  // CharacterRotate [portrait, degrees, s]
 
       case 11: return this.talk(a, true);
       case 12: return this.talk(a, false);
@@ -206,22 +233,24 @@ export class Player {
       case 21: return this.titleShow(a[0], a[1]);
 
       case 15: return this.wait(num(a[0]));
-      case 51: return a[1] === 'wait' ? this.wait(num(a[0])) : undefined;  // timed pause (blocks only when 'wait')
-      case 19: return this.fade('#000', 1, num(a[0], 0.5)).then(() => this.sceneReset());
+      // 51 releases the 50 tint (221 times the previous screen command is a 50) over a[0] s
+      case 51: { const p = this.tint(null, 0, num(a[0])); return a[1] === 'wait' ? p : undefined; }
+      case 19: return this.fade(hex(a[1], '#000'), 1, num(a[0], 0.5)).then(() => this.sceneReset());  // a[1]: colour (ffffff ×1284)
       case 20: return this.fade(null, 0, num(a[0], 0.5));
-      case 50: { const p = this.fade(hex(a[0]), num(a[2]), num(a[3])); return a[4] === 'wait' ? p : undefined; }
-      case 32: return this.flash(hex(a[0], '#fff'), num(a[2]), num(a[3]), num(a[4]));
+      // 50 [colour, layer, seconds, opacity, wait]: e.g. "10.0 1.0" = darken over 10 s, "1.0 0.5" = half-dark
+      case 50: { const p = this.tint(hex(a[0]), num(a[3], 1), num(a[2])); return a[4] === 'wait' ? p : undefined; }
+      case 32: { const p = this.flash(hex(a[0], '#fff'), num(a[2]), num(a[3]), num(a[4])); return a[5] === 'no_wait' ? undefined : p; }
       case 52: { const p = this.flash(hex(a[0], '#fff'), num(a[3]), 0, num(a[4]), num(a[2], 1)); return a[5] === 'wait' ? p : undefined; }
-      case 16: { const tgt = (a[0] === 'character' || a[0] === 'image') && a[1] ? a[0] + '/' + a[1] : a[0]; return this.quake(tgt, num(a[2], 10), num(a[4], 0.5)); }
+      case 16: { const tgt = (a[0] === 'character' || a[0] === 'image') && a[1] ? a[0] + '/' + a[1] : a[0]; return this.quake(tgt, num(a[2], 10), num(a[3], num(a[2], 10)), num(a[4], 0.5)); }  // amp X, amp Y
 
       case 22: case 31: return this.bgmStart(a[0], num(a[1]));
       case 30: return this.bgmStop(num(a[0], 1));
       case 37: return this.volume(a[0], num(a[1], 1), num(a[2]));
       case 18: return this.se(a[0], num(a[1]));
-      case 33: return this.seLoop(a[0], num(a[1], 1), num(a[2]));
+      case 33: return this.seStop(a[0], num(a[1]), num(a[2], 0.3));  // SeStop: se, delay, fade-out
       case 42: for (const l of this.loops) l.pause(); this.loops = []; return;
 
-      case 64: this.peTarget = a[0] || 'none'; return;
+      case 64: this.peTarget = a[0] || 'none'; this.peChars = a.slice(1).filter((k) => k && k.startsWith('novel_portrait')); return;
       case 65: { const p = this.peStart(a); return a[0] === 'wait' ? p : undefined; }
       case 66: { const p = this.peEnd(a); return a[0] === 'wait' ? p : undefined; }
 
@@ -238,14 +267,16 @@ export class Player {
       case 54: return this.lwfSet(a[0], a[1], num(a[2], 640), num(a[3], 360));
       case 55: { const p = this.lwfShow(a[0], a[1], null, null, num(a[3])); return a[4] === 'wait' ? p : undefined; }
       case 56: { const p = this.lwfHide(a[0], a[1], num(a[3])); return a[4] === 'wait' ? p : undefined; }
-      case 58: return this.lwfHide(a[0], a[1], num(a[2]));
+      // 54 Set → 58 scale / 59 rotation / 69 z-order / 68 move / 57 flip / 70 parent → 55 Show: properties of
+      // the instance Set just made (58 sits between 54 and 55 on the same instance in 930+175 cases)
+      case 58: { const f = this.fxGet(a[0], a[1]); if (f) { f.scale = num(a[2], 1); this.lwfPlace(f); } return; }
       case 59: { const f = this.fxGet(a[0], a[1]); if (f) { f.rot = num(a[2]); this.lwfPlace(f); } return; }
       case 68: return this.lwfMove(a);
       // scenario LWF effects (auras, sparkles, explosions). 69 offsets x from centre; 57 shows by
       // label; 70 attaches to a character/image (shown at centre here as a best effort).
-      case 69: this.lwfShow(a[0], a[1], 640 + num(a[2]), 360, 0, true); return;
-      case 57: this.lwfShow(a[0], a[1], 640, 360, 0, true); return;
-      case 70: this.lwfShow(a[0], a[1], 640, 360, 0, true); return;
+      case 69: return this.lwfZ(a[0], a[1], num(a[2]));
+      case 57: { const f = this.fxGet(a[0], a[1]); if (f) { f.flipX = a[2] === '1'; f.flipY = a[3] === '1'; this.lwfPlace(f); } return; }
+      case 70: return this.lwfParent(a[0], a[1], a[3], a[4]);
       default: return; // 13/28/43/49/71/74: markers, achievements, battle setup — not rendered
     }
   }
@@ -273,13 +304,13 @@ export class Player {
   }
   xf(st) { return `translate(-50%,-50%) translate(${st.x}px,${-st.y}px) scale(${st.s}) rotate(${st.r}deg)`; }
   applyXform(st) { st.el.getAnimations().forEach((a) => a.cancel()); st.el.style.transform = this.xf(st); }
-  async imageXform(key, ch, sec) {
+  async imageXform(key, ch, sec, easing) {
     const st = this.imageState(key);
     const from = this.xf(st);
     Object.assign(st, ch);
     const to = this.xf(st);
     st.el.style.transform = to;
-    if (sec > 0 && !this.skip) await this.anim(st.el, [{ transform: from }, { transform: to }], sec, { fill: 'none' });
+    if (sec > 0 && !this.skip) await this.anim(st.el, [{ transform: from }, { transform: to }], sec, { fill: 'none', easing: cssEase(easing) });
   }
   async imageShow(key, layerName, trans, sec) {
     const st = this.imageState(key);
@@ -322,7 +353,25 @@ export class Player {
     this.charPlace(st);
     return st;
   }
-  charPlace(st) { st.el.style.transform = `translate(${st.x}px,${-st.y}px) scale(${st.s})`; }
+  charPlace(st) { st.el.style.transform = `translate(${st.x}px,${-st.y}px) scale(${st.s})${st.r ? ` rotate(${st.r}deg)` : ''}`; }
+  async charRotate(key, deg, sec) {
+    const st = this.charState(key);
+    const from = st.el.style.transform;
+    st.r = deg; this.charPlace(st);
+    if (sec > 0 && !this.skip) await this.anim(st.el, [{ transform: from }, { transform: st.el.style.transform }], sec, { fill: 'none' });
+  }
+  // emotion marks (漫符): files/icon/novel/manpu_<mark>.png, offset from the face, pop in, then fade
+  async manpu(key, dx, dy, mark) {
+    const st = this.charState(key), src = this.res('manpu.' + mark);
+    if (!src || !st.info) return;
+    const im = document.createElement('img');
+    im.className = 'manpu'; im.src = src;
+    const cut = st.info.cut || [0, 0], fs = st.info.fs || [140, 160];
+    im.style.left = (cut[0] + fs[0] / 2 + dx) + 'px'; im.style.top = (cut[1] - dy) + 'px';
+    st.el.querySelector('.pt').appendChild(im);
+    await this.anim(im, [{ transform: 'translate(-50%,-50%) scale(0.4)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1.15)', opacity: 1, offset: 0.6 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 1 }], 0.3);
+    setTimeout(() => this.anim(im, [{ opacity: 1 }, { opacity: 0 }], 0.4).then(() => im.remove()), this.skip ? 0 : 1200);
+  }
   charFace(key, face) {
     if (!key || !key.startsWith('novel_portrait')) return;
     const st = this.charState(key);
@@ -348,12 +397,16 @@ export class Player {
     this.charFace(key, face);
     // [key, face, X, '', '', sec] = appear at X; [key, face, fromX, toX, sec, …] = slide fromX→toX.
     // Only a numeric a[3] means a slide; otherwise it's a static appear at a[2] (empty a[3] is not a 0 target).
+    // a[5] = fade-in seconds (0.5 / 1.0 / 0.3 / 0 in 6,252 of 12,027 uses); without it the portrait pops in
     let to = num(a[2], 640), from = null, sec = 0;
     const slide = a[3] !== undefined && a[3] !== '' && !isNaN(parseFloat(a[3]));
     if (slide) { from = num(a[2]); to = num(a[3]); sec = num(a[4]); }
+    const fade = st.vis ? 0 : num(a[5], 0);
     st.x = from ?? to; this.charPlace(st);
-    st.el.style.opacity = 1; st.vis = true;
-    if (from !== null) await this.charMove(key, to, 0, sec, false);
+    st.vis = true;
+    const fadeIn = fade > 0 ? this.anim(st.el, [{ opacity: 0 }, { opacity: 1 }], fade).then(() => { st.el.getAnimations().forEach((x) => x.cancel()); st.el.style.opacity = 1; })
+      : (st.el.style.opacity = 1, Promise.resolve());
+    await Promise.all([fadeIn, from !== null ? this.charMove(key, to, 0, sec, false) : null]);
   }
   async charShowHide(a, show) {
     const keys = a.filter((s) => s && s.startsWith('novel_portrait'));
@@ -377,13 +430,13 @@ export class Player {
     const from = st.el.style.transform;
     if (relative) { st.x += x; st.y += y; } else { st.x = x; st.y = y; }
     this.charPlace(st);
-    if (sec > 0 && !this.skip) await this.anim(st.el, [{ transform: from }, { transform: st.el.style.transform }], sec, { fill: 'none', easing: easing || 'ease' });
+    if (sec > 0 && !this.skip) await this.anim(st.el, [{ transform: from }, { transform: st.el.style.transform }], sec, { fill: 'none', easing: easing || 'linear' });
   }
-  async charScale(key, s, sec) {
+  async charScale(key, s, sec, easing) {
     const st = this.charState(key);
     const from = st.el.style.transform;
     st.s = s; this.charPlace(st);
-    if (sec > 0 && !this.skip) await this.anim(st.el, [{ transform: from }, { transform: st.el.style.transform }], sec, { fill: 'none' });
+    if (sec > 0 && !this.skip) await this.anim(st.el, [{ transform: from }, { transform: st.el.style.transform }], sec, { fill: 'none', easing: easing || 'linear' });
   }
   charHop(key) {
     const st = this.charState(key);
@@ -449,8 +502,11 @@ export class Player {
     await this.typeInto(this.msgText, text || '');
     if (waitTap) { this.msg.classList.add('ready'); await this.waitClick(); }
   }
+  // Selection: [textA, lenA, textB, lenB, voices, name]. The next lenA commands are branch A, the lenB after
+  // them branch B (checked: B's text lands at +lenA in 451/491 choices); only the picked branch plays.
   async selection(a) {
     const [ta, , tb, , voices, name] = a;
+    const lenA = Math.max(0, Math.round(num(a[1]))), lenB = Math.max(0, Math.round(num(a[3])));
     const vs = (voices || '').split(/\s+/).filter(Boolean);
     this.msg.classList.add('hidden');
     this.choiceEl.innerHTML = '';
@@ -469,7 +525,14 @@ export class Player {
     }
     this.choiceEl.classList.add('hidden');
     const text = pick ? tb : ta;
-    const voiceKey = vs[pick];
+    const voiceKey = vs[pick] ?? vs[0];
+    const start = this.pc + 1 + (pick ? lenA : 0), cmds = this.novel.cmds;
+    if (pick) this.pc += lenA;  // the loop's pc++ then lands on branch B
+    else if (lenB) this.jumps.push({ at: this.pc + 1 + lenA, n: lenB });
+    // about half the unvoiced branches open by repeating the choice; don't say it twice
+    const first = cmds.slice(start, start + (pick ? lenB : lenA)).find((c) => c[0] === 11 || c[0] === 12 || c[0] === 45);
+    const plain = (t) => String(t || '').replace(/\[r=[^\]]*\]|\[\/r\]|\s/g, '');
+    if (first && plain(first[first.length - 1]) === plain(text)) return;
     return this.talk(['', '', '', 'middle', voiceKey, name, text], true);
   }
   async descShow(color, alpha, sec) {
@@ -486,6 +549,7 @@ export class Player {
     // are always followed by one (letter_box bars etc. are re-issued after each fade-in)
     for (const f of new Set(this.fx.values())) this.lwfDestroy(f);
     this.fx.clear();
+    this.tintEl.getAnimations().forEach((x) => x.cancel()); this.tintEl.style.opacity = 0;
     // ...and clears the stage except the background: portraits still up (23k cases are never hidden or
     // re-shown afterwards) and middle/foreground images. Scripts rebuild the scene before fading in.
     for (const st of Object.values(this.chars)) { st.el.getAnimations().forEach((x) => x.cancel()); st.el.style.opacity = 0; st.vis = false; }
@@ -526,6 +590,13 @@ export class Player {
   }
 
   // ---------------------------------------------------------------- screen
+  async tint(color, alpha, sec) {
+    if (color) this.tintEl.style.background = color;
+    const from = getComputedStyle(this.tintEl).opacity;
+    await this.anim(this.tintEl, [{ opacity: from }, { opacity: alpha }], sec);
+    this.tintEl.getAnimations().forEach((x) => x.cancel());
+    this.tintEl.style.opacity = alpha;
+  }
   async fade(color, alpha, sec) {
     if (color) this.fadeEl.style.background = color;
     const from = getComputedStyle(this.fadeEl).opacity;
@@ -543,7 +614,8 @@ export class Player {
     await this.anim(f, [{ opacity: peak }, { opacity: 0 }], tout);
     f.remove();
   }
-  quake(target, amp, sec) {
+  quake(target, amp, ampY, sec) {
+    if (sec === undefined) { sec = ampY; ampY = amp; }
     let el = this.stage;
     if (target && target.startsWith('character')) {
       const k = target.split('/')[1];
@@ -554,7 +626,7 @@ export class Player {
     } else if (target === 'background') el = this.L.bg;
     const n = Math.max(2, Math.round(sec * 30));
     const frames = [];
-    for (let i = 0; i < n; i++) { const k = 1 - i / n; frames.push({ translate: `${(Math.random() * 2 - 1) * amp * k}px ${(Math.random() * 2 - 1) * amp * k}px` }); }
+    for (let i = 0; i < n; i++) { const k = 1 - i / n; frames.push({ translate: `${(Math.random() * 2 - 1) * amp * k}px ${(Math.random() * 2 - 1) * ampY * k}px` }); }
     frames.push({ translate: '0 0' });
     if (el === this.stage) { el = this.stage.querySelector('[data-l="bg"]').parentNode; }
     const layers = el === this.stage ? Object.values(this.L) : [el];
@@ -564,6 +636,7 @@ export class Player {
   // post effects: color_multiplier via SVG feColorMatrix, blur via CSS
   peLayers() {
     const t = this.peTarget;
+    if (this.peChars?.length) return this.peChars.map((k) => this.charState(k).el);  // 64 named portraits only
     if (t === 'background') return [this.L.bg, this.L.mid];
     if (t === 'middle') return [this.L.chars];
     if (t === 'background_middle') return [this.L.bg, this.L.mid, this.L.chars];
@@ -608,12 +681,14 @@ export class Player {
 
   // animation text (credits, chapter captions)
   atextSet(a) {
-    const [id, x, y, anchor] = a;
+    const [id, x, y, anchor, align] = a;
     let el = this.atext.querySelector(`[data-id="${id}"]`);
     if (!el) { el = document.createElement('div'); el.className = 'at'; el.dataset.id = id; this.atext.appendChild(el); }
     el._x = num(x); el._y = num(y);
     el.style.left = 640 + el._x + 'px';
     el.style[anchor === 'top' ? 'top' : 'bottom'] = el._y + 'px';
+    el.style.transform = align === 'left' ? 'none' : align === 'right' ? 'translateX(-100%)' : '';
+    el.style.textAlign = align === 'left' || align === 'right' ? align : '';
     el.style.opacity = 0;
   }
   async atextShow(a) {
@@ -664,6 +739,23 @@ export class Player {
     f.lwf.property.clear();
     f.lwf.property.moveTo(f.x, H - f.y);
     if (f.rot) f.lwf.property.rotateTo(f.rot);
+    const s = f.scale ?? 1;
+    if (s !== 1 || f.flipX || f.flipY) f.lwf.property.scaleTo(s * (f.flipX ? -1 : 1), s * (f.flipY ? -1 : 1));
+  }
+  // LwfZOrder: below 0 the effect goes behind the characters (values like ±200 / ±50, as with 38)
+  lwfZ(key, label, z) {
+    const f = this.fxGet(key, label);
+    if (!f) return;
+    f.canvas.style.zIndex = String(Math.round(z) + 1000);
+    const layer = z < 0 ? this.L.mid : this.L.fx;
+    if (f.canvas.parentNode !== layer) layer.appendChild(f.canvas);
+  }
+  // LwfParent [lwf, inst, add, image|chara, target]: draw the effect with that image / character (right above it)
+  lwfParent(key, label, kind, target) {
+    const f = this.fxGet(key, label);
+    if (!f) return;
+    const host = kind === 'chara' ? this.chars[target]?.el : this.images[target]?.el;
+    if (host && host.parentNode) host.parentNode.insertBefore(f.canvas, host.nextSibling);
   }
   lwfDestroy(f) { try { f.lwf.destroy(); } catch (e) {} f.canvas.remove(); }
   fxId(key, label) { return key + '#' + (label || ''); }
@@ -728,13 +820,13 @@ export class Player {
     await this.wait(sec);
   }
   lwfMove(a) {
-    const [key, label, x, y, sec, mode] = a;
+    const [key, label, x, y, sec, mode, easing] = a;
     const f = this.fxGet(key, label);
     if (!f) return;
     const x1 = mode === 'relative' ? f.x + num(x) : num(x), y1 = mode === 'relative' ? f.y + num(y) : num(y);
     const ms = this.d(num(sec));
     if (!ms) { f.x = x1; f.y = y1; this.lwfPlace(f); return; }
-    f.tw = { t0: performance.now(), ms, x0: f.x, y0: f.y, x1, y1 };
+    f.tw = { t0: performance.now(), ms, x0: f.x, y0: f.y, x1, y1, ease: easeFn(easing) };
   }
 
   // ---------------------------------------------------------------- audio
@@ -769,22 +861,28 @@ export class Player {
   }
   volume(target, v, sec) {
     if (target === 'bgm' && this.bgm) { this.bgmLevel = v; return this.ramp(this.bgm, this.settings.bgm * v, sec); }
+    if (target && target.startsWith('se.')) {  // the SE started just before (512 uses)
+      const live = this.ses.filter((x) => x.key === target);
+      live.forEach((x) => { x.level = v; this.ramp(x.a, this.settings.se * v, sec); });
+    }
   }
+  // SEs play once; a SeStop (33) may cut one short with a fade, VolumeSet (37) may lower it
   se(key, delay) {
     const src = this.res(key);
     if (!src || this.skip) return;
     const a = new Audio(src);
     a.volume = this.settings.se;
-    setTimeout(() => a.play().catch(() => {}), delay * 1000);
+    const x = { key, a, level: 1 };
+    this.ses.push(x);
+    a.onended = () => { this.ses = this.ses.filter((y) => y !== x); };
+    x.timer = setTimeout(() => a.play().catch(() => {}), delay * 1000);
   }
-  seLoop(key, vol, fadeIn) {
-    const src = this.res(key);
-    if (!src) return;
-    const a = new Audio(src);
-    a.loop = true; a.volume = 0;
-    a.play().catch(() => {});
-    this.ramp(a, this.settings.se * vol, fadeIn);
-    this.loops.push(a);
+  seStop(key, delay, fade) {
+    for (const x of this.ses.filter((y) => y.key === key)) {
+      this.ses = this.ses.filter((y) => y !== x);
+      const stop = () => { clearTimeout(x.timer); if (fade > 0 && !this.skip) this.ramp(x.a, 0, fade).then(() => x.a.pause()); else x.a.pause(); };
+      if (delay > 0 && !this.skip) setTimeout(stop, delay * 1000); else stop();
+    }
   }
 
   async playMovie(key, skippable) {
