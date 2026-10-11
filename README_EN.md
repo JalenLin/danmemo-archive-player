@@ -2,19 +2,19 @@
 
 [中文](README.md) | English | [日本語](README_JP.md)
 
-Relive the stories of *DanMachi: Memoria Freese* (ダンメモ) in a desktop or mobile browser: backgrounds, character portraits and expressions, voices, BGM, sound effects, LWF effects, screen filters and cutscene movies. It also has the memorial app's album, per-character story lists, a portrait viewer and a card gallery.
+Relive the stories of *DanMachi: Memoria Freese* (ダンメモ) in a desktop or mobile browser: backgrounds, character portraits and expressions, voices, BGM, sound effects, LWF effects, screen filters and cutscene movies. It also has the memorial app's album (extended with every dated event), per-character stories and voice lines, a portrait viewer, a card gallery with the gacha reveal, and a movie page.
 
 **This project ships no game assets, no decrypted data and no keys.** Everything is generated from files you obtain yourself, for personal viewing only. Please do not redistribute game assets.
 
 ## Features
 
-- **Story** – full index of the main story, events and character stories. Reruns with the same content are merged; episodes already in the album link to it. Events show their original run dates, some with banners.
+- **Story** – the main story and the scripts without a run period (Glory Challenges, tutorials…). Every event with a run period is in the Album. Reruns with the same content are merged. Events show their original run dates, some with banners.
 - **Album** – the memorial app's "Anniversary / Event Story" album: the 48 original events it selected, with banners and run dates (with global data the same selection is applied to the global titles, banners and scripts), plus tabs for the events it leaves out that have a run period: other events, descent events, and reruns whose content differs from the first run.
 - **Character Stories** – costume stories, character quests and interaction stories per character, plus a profile and the character's voice lines (login, greetings, touch, talk, town, alarm, costume change, system; about 8,300–8,600).
 - **Portraits** – portrait and expression viewer.
 - **Cards** – card stats and the gacha reveal (with global data it uses the game's official English name plates; for JP data about 342 official plates can be recovered through an old APK's manifest, fetched by `tools/fill_gaps.py`, and the rest are drawn in the rarity's colours; the gacha line is a vertical-text image, also fetched by `fill_gaps.py`: ~690 cards with global data, ~281 with JP data).
 - **Movies** – the cutscene movies the stories play (e.g. the seven 6th-anniversary SO12 movies), watchable on their own, each linked to its episode.
-- **Others** – story fragments that are not in the index. Start-up previews / home-screen stories tied to an event appear at the top of that event; the rest are listed by date.
+- **Others** – story fragments that are not in the index. Start-up previews / home-screen stories tied to an event appear at the top of that event; the rest are listed by date, the TV-anime pre-broadcast ones per season.
 - Player: AUTO, SKIP (hold left Ctrl, or toggle), LOG (replay voices), Hide (hide the text box for screenshots: H key or right-click), Settings (text-box colour/opacity, skip delay), continuous playback across a chapter, read marks.
 - Interface in English, Japanese or Chinese (picker at the top right; defaults to your browser's language). Story text stays in the language of the data you built from.
 
@@ -151,7 +151,7 @@ Known gaps: about 850 voice lines, 150 images and 20 sound effects that the scri
      ```bash
      ./venv/bin/python tools/fetch_manifests.py
      ./venv/bin/python tools/download.py
-     cd assets/files/sound && mkdir -p voice_episode && for z in voice_episode_zip/*.zip; do unzip -q -n "$z" -d voice_episode; done; cd -
+     cd assets/files/sound && mkdir -p voice_episode && for z in voice_episode_zip/*.zip; do unzip -q -n "$z" -d voice_episode; done; cd -   # fill_gaps.py also unpacks these
      ```
    - or from your own app-data backup: add each folder that contains `files/` to `asset_roots`.
 4. Convert movies (`tools/usm.py`, as above), then:
@@ -174,7 +174,7 @@ The memorial app has no gacha, and its manifests omit many files the stories use
 | Official name plates / gacha lines | 108 / 75 (from an early 2017 snapshot) | 342 / 281 |
 | Gacha reveal (cuts, opening movies) | no | yes |
 
-Later cards and events exist only in the global data; mixing them in is opt-in (`fallback_manifests` in `config.json`) and brings their English text along.
+Later cards and events exist only in the global data. To get the most complete build (mixed), either list the global manifests under `fallback_manifests` in `config.json` (e.g. a global backup's `contents/*/project.manifest`; `fill_gaps.py` then downloads what is missing), or add the global backup's folders to `asset_roots` after the Japanese ones. Images filled in this way are the English versions.
 
 Optionally, add the global backup's scripts as a translation source in `config.json` (`"translations": {"en": {"novel_dirs": [...], "master_dirs": [...]}}`) and run `tools/decrypt_all.py --lang en` (→ `dec_en/`).
 
@@ -208,7 +208,8 @@ tools/usm.py             CRI USM → MP4
 tools/gachanames.py      gacha name plates (called by build_web.py)
 tools/serve.py           local server with HTTP Range support
 web/js/i18n.js           interface strings (Japanese keys → English / Chinese) and date formats
-tools/smoke.py, shot.py  player tests / screenshots (Playwright; set DANMEMO_URL)
+tools/smoke.py           player test: plays stories in skip mode and reports hangs, command errors and failed asset loads (`smoke.py all --workers 10` for every story; Playwright; set DANMEMO_URL)
+tools/shot.py            screenshots (same)
 tools/gdrive_ls.py, gdrive_get.py   list / download a public Google Drive folder
 tools/wayback_get.py     download JP notice art and pages known to the Wayback Machine (research)
 tools/elfre.py, reloc.py, novelcmd_map.py   libapp.so analysis helpers

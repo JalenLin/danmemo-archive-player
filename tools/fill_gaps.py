@@ -81,9 +81,12 @@ for d in sorted(glob.glob(os.path.join(CFG["legacy_manifests"], "*", "")), key=l
             LEGACY_MAN.setdefault(k, v)
 BACKUP = _files([os.path.join(r, "project.manifest") for r in CFG["asset_roots"]]
                 + [os.path.join(r, "manifests", "*.manifest") for r in CFG["asset_roots"]])
+ALTS = {}  # key -> every source's entry in priority order (an old build's URL can be gone while a later one serves it)
 for src in [OWN, LEGACY_MAN] + [manifest_entries(f) for f in BACKUP + _files(CFG["fallback_manifests"])]:
     for k, v in src.items():
         MAN.setdefault(k, v)
+        if all(v["path"] != x["path"] for x in ALTS.setdefault(k, [])):
+            ALTS[k].append(v)
 FALLBACK_KEYS = set(MAN) - set(OWN) - set(LEGACY_MAN) - {k for f in BACKUP for k in manifest_entries(f)}
 BYBASE = {}
 for k in MAN:
@@ -260,24 +263,30 @@ def fetch(key):
     dst = f"{ASSETS}/{key}"
     if in_apk(key) or elsewhere(key):
         return ("have", key)
-    if os.path.exists(dst) and os.path.getsize(dst) == info["size"] and md5_of(dst) == info["md5"]:
+    if os.path.exists(dst) and any(os.path.getsize(dst) == a["size"] for a in ALTS.get(key, [info])) \
+            and md5_of(dst) in {a["md5"] for a in ALTS.get(key, [info])}:
         return ("skip", key)
     if os.path.exists(dst) and key.startswith("files/ui/single_image/"):
         return ("skip", key)  # another build's copy: same picture, only re-encoded; not worth refetching
     if DRY:
         return ("would", key)
-    try:
-        req = urllib.request.Request(CDN + info["path"], headers={"User-Agent": "CocosDownloader"})
-        data = urllib.request.urlopen(req, timeout=30).read()
-        if hashlib.md5(data).hexdigest() != info["md5"]:
-            return ("badmd5", key)
+    status = "fail"
+    for alt in ALTS.get(key, [info]):  # first source that serves it with the right md5
+        try:
+            req = urllib.request.Request(CDN + alt["path"], headers={"User-Agent": "CocosDownloader"})
+            data = urllib.request.urlopen(req, timeout=30).read()
+        except Exception as e:
+            status = "fail:" + str(e)[:40]
+            continue
+        if hashlib.md5(data).hexdigest() != alt["md5"]:
+            status = "badmd5"
+            continue
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         tmp = dst + ".tmp"
         open(tmp, "wb").write(data)
         os.replace(tmp, dst)
         return ("ok", key)
-    except Exception as e:
-        return ("fail:" + str(e)[:40], key)
+    return (status, key)
 
 
 LEGACY_LOTTERY = {"name": ("name_jp", (960, 240)),  # gacha name plates
