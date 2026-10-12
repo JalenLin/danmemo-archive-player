@@ -212,22 +212,9 @@ def unzip_voices():
 
 
 def convert_movies():
-    """Turn downloaded .usm cutscenes into the .mp4 the player uses (tools/usm.py, needs ffmpeg)."""
-    import subprocess
-    done = 0
-    for usm in glob.glob(os.path.join(ASSETS, "files", "movie", "*.usm")):
-        mp4 = usm[:-4] + ".mp4"
-        if os.path.exists(mp4) or any(os.path.exists(os.path.join(r, "files", "movie", os.path.basename(mp4))) for r in OTHER_ROOTS):
-            continue
-        if DRY:
-            print("  would convert", os.path.basename(usm))
-            continue
-        try:
-            import usm as usm_tool
-            usm_tool.convert(usm, mp4)
-        except (OSError, subprocess.CalledProcessError) as e:  # no ffmpeg, or a broken file: the movie stays .usm
-            print("  movie not converted:", os.path.basename(usm), e)
-        done += os.path.exists(mp4)
+    """The .usm cutscenes (the backup's and downloaded ones) -> the .mp4 the player uses (tools/usm.py, ffmpeg)."""
+    import usm as usm_tool
+    done, _ = usm_tool.convert_missing(OTHER_ROOTS, ASSETS, DRY)
     return done
 
 

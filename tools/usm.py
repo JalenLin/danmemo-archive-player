@@ -1,14 +1,26 @@
 """Minimal CRI USM demuxer + MP4 conversion via ffmpeg.
 
 Usage: python tools/usm.py <in.usm> [out.mp4]
+The video is H.264 (Baseline / Main, yuv420p): copied into the mp4 as it is (browsers play it; checked: same
+length as a re-encode, video and audio in step); only the CRI audio (ADX / HCA) is converted, to AAC.
+DANMEMO_FFMPEG names the ffmpeg to run (the Android app ships its own).
 Chunk layout: sig[4] size(u32be) unk(u8) hdr_off(u8) pad(u16be) chno(u8) .. type(u8 @0x0F); payload at 8+hdr_off.
 type 0 = stream data. @SFV = video elementary stream, @SFA = audio (ADX/HCA).
 """
+import glob
 import os
+import shutil
 import struct
 import subprocess
 import sys
 import tempfile
+
+
+FFMPEG = os.environ.get("DANMEMO_FFMPEG") or "ffmpeg"
+
+
+def have_ffmpeg():
+    return bool(shutil.which(FFMPEG) or os.path.isfile(FFMPEG))
 
 
 def demux(path):
@@ -42,7 +54,7 @@ def convert(src, dst, fps=29.97):
                 continue
             open(p, "wb").write(buf)
             inputs.append(p)
-        cmd = ["ffmpeg", "-y", "-loglevel", "error"]
+        cmd = [FFMPEG, "-y", "-loglevel", "error"]
         for p in inputs:
             if p.endswith("v.bin"):
                 cmd += ["-f", "h264", "-framerate", str(fps), "-i", p]
@@ -50,9 +62,38 @@ def convert(src, dst, fps=29.97):
                 head = open(p, "rb").read(4)
                 fmt = "adx" if head[:2] == b"\x80\x00" else "hca"
                 cmd += ["-f", fmt, "-i", p]
-        cmd += ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", "-c:a", "aac", "-b:a", "160k",
-                "-movflags", "+faststart", dst]
-        subprocess.run(cmd, check=True)
+        out = ["-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", "-f", "mp4", dst + ".part"]
+        try:
+            subprocess.run(cmd + ["-c:v", "copy"] + out, check=True)
+        except subprocess.CalledProcessError:  # an odd stream: re-encode (needs an ffmpeg with libx264)
+            subprocess.run(cmd + ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20"] + out, check=True)
+        os.replace(dst + ".part", dst)
+
+
+def convert_missing(roots, out_root, dry=False):
+    """Every files/movie/<name>.usm in the asset roots that has no <name>.mp4 in any of them -> out_root (the
+    download folder; the user's backup is left as it is). Returns (converted, failed)."""
+    roots = [out_root] + [r for r in roots if os.path.abspath(r) != os.path.abspath(out_root)]
+    have = {os.path.basename(f)[:-4] for r in roots for f in glob.glob(os.path.join(r, "files", "movie", "*.mp4"))}
+    usms = {}
+    for r in roots:  # first root wins
+        for f in sorted(glob.glob(os.path.join(r, "files", "movie", "*.usm"))):
+            usms.setdefault(os.path.basename(f)[:-4], f)
+    todo = [(n, f) for n, f in sorted(usms.items()) if n not in have]
+    done, failed = 0, []
+    if todo and not dry:
+        os.makedirs(os.path.join(out_root, "files", "movie"), exist_ok=True)
+    for n, f in todo:
+        if dry:
+            print("  would convert", n, flush=True)
+            continue
+        try:
+            convert(f, os.path.join(out_root, "files", "movie", n + ".mp4"))
+            done += 1
+        except (OSError, subprocess.CalledProcessError) as e:  # no ffmpeg, or a broken file
+            failed.append(n)
+            print("  movie not converted:", n, e, flush=True)
+    return done, failed
 
 
 if __name__ == "__main__":

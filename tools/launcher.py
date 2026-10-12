@@ -178,7 +178,21 @@ def built():
 # ---------------------------------------------------------------- build steps (each in a child process)
 STEPS = [("keys", "Derive the keys from the APK"), ("decrypt", "Decrypt the stories and master data"),
          ("fill", "Download what the backup lacks from the game's CDN (~1.6 GB, optional)"),
+         ("movies", "Convert the cutscene movies (.usm -> .mp4)"),
          ("build", "Build the player's data")]
+
+
+def ffmpeg_dir():
+    """the ffmpeg shipped next to the program (Windows build), if any"""
+    d = os.path.join(APP, "ffmpeg")
+    return d if os.path.isdir(d) else None
+
+
+def have_ffmpeg():
+    import usm
+    if ffmpeg_dir():
+        return True
+    return usm.have_ffmpeg()
 
 
 def run_step(name):
@@ -194,6 +208,14 @@ def run_step(name):
     if name == "decrypt":
         import decrypt_all
         return decrypt_all.main(["decrypt_all.py", "--player"])
+    if name == "movies":
+        import usm
+        if not usm.have_ffmpeg():
+            print("ffmpeg not found: the cutscene movies are left out", flush=True)
+            return 0
+        done, failed = usm.convert_missing(cfg["asset_roots"], cfg["downloads"])
+        print(f"converted movies: {done}" + (f", failed: {len(failed)}" if failed else ""), flush=True)
+        return 0
     import runpy
     mod = {"fill": "fill_gaps", "build": "build_web"}[name]
     sys.argv = [mod + ".py"]
@@ -321,7 +343,7 @@ def make_handler():
                 found = detect()
                 body = {"found": {"keysrc": found["keysrc"], "dump": found["dump"], "notes": found["notes"]},
                         "data": DATA, "state": JOB.state, "step": JOB.step, "built": built(), "log": JOB.log[-200:],
-                        "ffmpeg": bool(shutil.which("ffmpeg")) or os.path.isdir(os.path.join(APP, "ffmpeg"))}
+                        "ffmpeg": have_ffmpeg()}
                 return self._send(200, "application/json", json.dumps(body, ensure_ascii=False).encode())
             if not built() and self.path in ("/", "/index.html"):
                 self.send_response(302); self.send_header("Location", "/setup"); self.end_headers()

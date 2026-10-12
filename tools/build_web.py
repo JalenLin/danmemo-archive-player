@@ -324,6 +324,33 @@ def build_voices(chars_tbl):
 MOVIE_GROUPS = [("6th_movie_", "6周年ムービー")]  # file-name prefix -> section title (others: "ムービー")
 
 
+def mp4_duration(path):
+    """seconds from the mp4's moov/mvhd box (no ffprobe needed)"""
+    with open(path, "rb") as f:
+        def boxes(end):
+            while f.tell() + 8 <= end:
+                start = f.tell()
+                size, kind = struct.unpack(">I4s", f.read(8))
+                if size == 1:
+                    size = struct.unpack(">Q", f.read(8))[0]
+                elif size == 0:
+                    size = end - start
+                yield kind, start, size
+                f.seek(start + size)
+        for kind, start, size in boxes(os.path.getsize(path)):
+            if kind == b"moov":
+                f.seek(start + 8)
+                for k2, s2, _ in boxes(start + size):
+                    if k2 == b"mvhd":
+                        f.seek(s2 + 8)
+                        ver = f.read(1)[0]
+                        f.seek(s2 + (28 if ver == 1 else 20))
+                        scale = struct.unpack(">I", f.read(4))[0]
+                        dur = struct.unpack(">Q" if ver == 1 else ">I", f.read(8 if ver == 1 else 4))[0]
+                        return dur / scale if scale else None
+    return None
+
+
 def build_movies(refs, movie, titles):
     """data/movies.json: the cutscene movies the stories play, each with the stories it appears in, in story
     order, plus a poster frame (needs ffmpeg; skipped otherwise)."""
@@ -337,15 +364,14 @@ def build_movies(refs, movie, titles):
         disk = next((d + src[len(w):] for w, d in ROOTS if src.startswith(w)), os.path.join(WEB, src))  # no symlink needed
         poster, dur = None, None
         try:
-            dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", disk],
-                                       capture_output=True, text=True, encoding="utf-8", timeout=60).stdout.strip() or 0) or None
+            dur = mp4_duration(disk)
             out = f"{WEB}/data/movies/{name}.jpg"
             if not os.path.exists(out):
                 # try a few frames and keep the busiest one (cutscenes often flash to white/black)
                 best = None
                 for i, frac in enumerate((0.2, 0.35, 0.5, 0.65, 0.8)):
                     tmp = f"{out}.{i}.jpg"
-                    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(round((dur or 4) * frac, 2)), "-i", disk,
+                    subprocess.run([os.environ.get("DANMEMO_FFMPEG") or "ffmpeg", "-v", "error", "-y", "-ss", str(round((dur or 4) * frac, 2)), "-i", disk,
                                     "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "4", tmp], timeout=120)
                     if os.path.exists(tmp):
                         from PIL import Image, ImageStat
