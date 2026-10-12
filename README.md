@@ -34,6 +34,8 @@
 
 ## Android 版（不用電腦）
 
+> 測試中，尚未發佈：Releases 目前只有 Windows 版。以下是預定的用法。
+
 到 [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) 下載 `DanMemoPlayer-android.apk` 安裝。需要 Android 7.0 以上的 64 位元手機。
 1. 在手機儲存空間建立 `DanMemo` 資料夾，放入國際版 APK 和解壓好的 App 資料備份（`contents` 資料夾）。RAR 分割檔可以用 ZArchiver 解壓。解壓時 RAR 和解壓結果會同時存在，請準備約 30 GB 空間，解壓完可以刪掉 RAR。
 2. 開啟 App，依提示允許「管理所有檔案」（用來讀取 `DanMemo` 資料夾）。

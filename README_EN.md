@@ -32,6 +32,8 @@ Download `DanMemoPlayer-windows.zip` from [Releases](https://github.com/JalenLin
 
 ## Android app (no computer needed)
 
+> Still being tested, not released yet: Releases carry the Windows app only for now. This is how it will work.
+
 Download `DanMemoPlayer-android.apk` from [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) and install it. It needs Android 7.0 or later on a 64-bit phone.
 1. Make a `DanMemo` folder in the phone's storage and put the global APK and the extracted app-data backup (the `contents` folder) in it. ZArchiver can extract the RAR parts. While extracting, the RAR parts and the extracted files coexist: have about 30 GB free (delete the RAR parts afterwards).
 2. Open the app and allow "manage all files" when asked (to read the `DanMemo` folder).

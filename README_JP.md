@@ -32,6 +32,8 @@
 
 ## Android 版（パソコン不要）
 
+> テスト中で、まだ公開していません（Releases は現在 Windows 版のみ）。以下は予定している使い方です。
+
 [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) から `DanMemoPlayer-android.apk` をダウンロードしてインストールします。Android 7.0 以上の 64 ビット端末が必要です。
 1. 端末のストレージに `DanMemo` フォルダを作り、グローバル版 APK と展開したアプリデータのバックアップ（`contents` フォルダ）を入れます。RAR の分割ファイルは ZArchiver などで展開できます。展開中は RAR と展開結果が両方あるので、約 30 GB の空きが必要です（展開後は RAR を削除して構いません）。
 2. アプリを開き、案内に従って「すべてのファイルの管理を許可」をオンにします（`DanMemo` フォルダを読むため）。
