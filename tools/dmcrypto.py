@@ -11,18 +11,26 @@ import zlib
 
 from Crypto.Cipher import AES
 
-_KEYS = json.load(open(os.environ.get("DANMEMO_KEYS")
-                       or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "keys.json"), encoding="utf-8"))
-AES_KEY = _KEYS["aes_key"].encode("latin-1")
-AES_IV = _KEYS["aes_iv"].encode("latin-1")
-XXTEA_KEY = _KEYS["xxtea_key"].encode("latin-1")
-
 _DELTA = 0x9E3779B9
-_K = struct.unpack("<4I", XXTEA_KEY)
+_KEYS = None
+
+
+def keys():
+    """(aes key, aes iv, xxtea key words), read from keys.json on first use, not on import: the launcher
+    imports the tools before the keys step has written the file"""
+    global _KEYS
+    if _KEYS is None:
+        k = json.load(open(os.environ.get("DANMEMO_KEYS")
+                           or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "keys.json"),
+                           encoding="utf-8"))
+        _KEYS = (k["aes_key"].encode("latin-1"), k["aes_iv"].encode("latin-1"),
+                 struct.unpack("<4I", k["xxtea_key"].encode("latin-1")))
+    return _KEYS
 
 
 def decrypt_file(data: bytes) -> bytes:
-    p = AES.new(AES_KEY, AES.MODE_CBC, AES_IV).decrypt(data)
+    aes_key, aes_iv, _ = keys()
+    p = AES.new(aes_key, AES.MODE_CBC, aes_iv).decrypt(data)
     p = p[: -p[-1]]
     return zlib.decompress(p)
 
@@ -32,6 +40,7 @@ def xxtea_decrypt_words(v):
     if n < 2:
         return v
     rounds = 6 + 52 // n
+    _K = keys()[2]
     s = (rounds * _DELTA) & 0xFFFFFFFF
     y = v[0]
     while rounds:

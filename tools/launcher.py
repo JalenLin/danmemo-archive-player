@@ -35,6 +35,8 @@ CONFIG = os.path.join(WORK, "config.json")
 SETTINGS = os.path.join(WORK, "settings.json")  # what the user picked on the setup page
 KEYS = os.path.join(WORK, "keys.json")
 TOOLS = os.path.join(APP, "tools")
+os.environ["DANMEMO_CONFIG"] = CONFIG  # for the tools imported here as well as the steps run in child processes
+os.environ["DANMEMO_KEYS"] = KEYS
 sys.path.insert(0, TOOLS)
 
 
