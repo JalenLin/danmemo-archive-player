@@ -66,6 +66,8 @@ h2 { font-size: 17px; margin: 22px 0 10px; color: var(--gold); }
 /* ---------------- player ---------------- */
 body.playing .top { display: none; }
 body.playing main { max-width: none; padding: 0; }
+/* phones: no grey flash over the whole stage on every tap (it advances the story) */
+.player-wrap, .player-wrap *, .viewer, .viewer *, .ppop, .vpop { -webkit-tap-highlight-color: transparent; }
 .player-wrap { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; }
 .player-bar { display: flex; gap: 6px; align-items: center; padding: 6px 10px; background: #0a0e18; border-bottom: 1px solid #1c2440; font-size: 13px; }
 .player-bar .ttl { color: var(--gold-2); margin-right: auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
