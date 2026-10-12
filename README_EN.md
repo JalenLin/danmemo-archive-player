@@ -228,6 +228,6 @@ docs/PROCESS.md          full analysis notes (Chinese)
 
 ## License
 
-- This project's code: not yet decided
+- This project's code: [MIT License](LICENSE)
 - `web/vendor/lwf.js`: GREE LWF, zlib License (see `web/vendor/LWF-LICENSE.txt`)
 - Game content is copyright of its respective owners

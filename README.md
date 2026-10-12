@@ -162,6 +162,6 @@ README_EN.md / README_JP.md  英文／日文說明
 
 ## 授權
 
-- 本專案程式：自行決定（尚未指定）
+- 本專案程式：[MIT License](LICENSE)
 - `web/vendor/lwf.js`：GREE LWF，zlib License（見 `web/vendor/LWF-LICENSE.txt`）
 - 遊戲內容的著作權屬於原權利人

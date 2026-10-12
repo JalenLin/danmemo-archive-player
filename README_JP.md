@@ -159,6 +159,6 @@ docs/PROCESS.md          解析と制作の記録（中国語）
 
 ## ライセンス
 
-- 本プロジェクトのコード：未定
+- 本プロジェクトのコード：[MIT License](LICENSE)
 - `web/vendor/lwf.js`：GREE LWF、zlib License（`web/vendor/LWF-LICENSE.txt` 参照）
 - ゲーム内容の著作権は各権利者に帰属します
