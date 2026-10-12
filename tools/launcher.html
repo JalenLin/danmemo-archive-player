@@ -80,6 +80,7 @@ const T = {
         ffok: 'found (cutscenes will be converted)', ffno: 'not found (cutscenes are skipped)',
         note: 'The build takes a few minutes, plus the download if chosen. Keep this page and the program window open until it says Ready.',
         pickapk: 'APK', pickdump: 'Backup folder', check: 'Use this folder', pick: 'Choose folder…', uploading: 'copying…', uploaded: 'saved',
+        noteapp: 'The build takes a few minutes (decryption about 5–10 on a phone), plus the download if chosen. Stay in this app until it says Ready: the screen stays on, but Android pauses apps you switch away from.',
         howapp: 'Choose the folder of the extracted backup (contents, or a folder that holds it), or put it in the data folder above. Nothing is copied.',
         howdump: 'Paste the path of the extracted backup (e.g. D:\\danmemo\\contents, or the folder that holds it). Nothing is copied.' },
   zh: { intro: '用你自己的遊戲資料建置劇情播放器。所有資料都留在這台裝置上。',
@@ -89,6 +90,7 @@ const T = {
         ffok: '有（會轉換過場影片）', ffno: '沒有（略過過場影片）',
         note: '建置約幾分鐘，勾選補下載的話另外加上下載時間。顯示「完成」之前，請保持這個頁面和程式視窗開著。',
         pickapk: 'APK', pickdump: '備份資料夾', check: '使用這個資料夾', pick: '選擇資料夾…', uploading: '複製中…', uploaded: '已存好',
+        noteapp: '建置約需幾分鐘（手機上解密約 5〜10 分鐘），勾選補下載的話再加上下載時間。顯示「完成」之前請留在這個 App：螢幕會保持常亮，但切到其他 App 時 Android 會暫停它。',
         howapp: '選擇解壓好的備份資料夾（contents 或包含它的資料夾），或直接放進上面的資料資料夾。不會複製檔案。',
         howdump: '貼上解壓後的備份所在路徑（例如 D:\\danmemo\\contents，或它的上一層資料夾）。不會複製檔案。' },
   ja: { intro: '自分のゲームデータからシナリオプレイヤーを作成します。データはこの端末から外に出ません。',
@@ -98,6 +100,7 @@ const T = {
         ffok: 'あり（ムービーを変換）', ffno: 'なし（ムービーは省略）',
         note: '作成は数分ほど（ダウンロードする場合はその時間が加わります）。「完了」と表示されるまで、このページとプログラムの画面を閉じないでください。',
         pickapk: 'APK', pickdump: 'バックアップのフォルダ', check: 'このフォルダを使う', pick: 'フォルダを選ぶ…', uploading: 'コピー中…', uploaded: '保存しました',
+        noteapp: '作成は数分ほど（端末での復号は 5〜10 分ほど）、ダウンロードする場合はその時間が加わります。「完了」と表示されるまでこのアプリを開いたままにしてください。画面はつけたままになりますが、他のアプリに切り替えると Android が一時停止します。',
         howapp: '展開したバックアップのフォルダ（contents、またはそれを含むフォルダ）を選ぶか、上のデータフォルダに置いてください。ファイルはコピーしません。',
         howdump: '展開したバックアップのパスを貼り付けてください（例：D:\\danmemo\\contents、またはその上のフォルダ）。ファイルはコピーしません。' },
 };
@@ -123,6 +126,7 @@ $('apkfile').onchange = () => {
 if (window.DanMemoApp) {
   $('dumppick').style.display = '';
   document.querySelector('[data-t=howdump]').textContent = L.howapp;
+  document.querySelector('[data-t=note]').textContent = L.noteapp;
   $('dumppick').onclick = () => window.DanMemoApp.pickFolder();
   $('dumppath').readOnly = true;  // tapping the field opens the picker too; the pick is applied at once
   $('dumppath').onclick = () => window.DanMemoApp.pickFolder();
