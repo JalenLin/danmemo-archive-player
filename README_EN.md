@@ -40,7 +40,7 @@ Download `DanMemoPlayer-android.apk` from [Releases](https://github.com/JalenLin
 3. The setup page finds the APK and the backup by itself; tap Build. Decryption takes about 5–10 minutes; keep the app in the foreground meanwhile.
 4. Then the player opens full screen. Held sideways, its toolbar hides itself; tap the top edge to bring it back.
 
-There is no ffmpeg on the phone, so the few `.usm` cutscenes only the CDN has aren't converted; the backup's own movies play normally.
+There is no ffmpeg on the phone, so the `.usm` cutscene movies can't be converted: the Android app has no cutscene movies for now (stories skip them; everything else plays).
 
 ## Two ways to set it up
 
