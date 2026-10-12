@@ -43,6 +43,9 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/player"))
+    // ffmpeg for the cutscene movies (android/ffmpeg/build.sh); unpacked on install so it can be run
+    sourceSets["main"].jniLibs.srcDir(rootProject.file("ffmpeg/out"))
+    packaging { jniLibs { useLegacyPackaging = true } }
 }
 
 chaquopy {
@@ -62,6 +65,7 @@ val copyPlayer by tasks.registering(Sync::class) {
     from(File(repo, "tools")) { include("*.py", "launcher.html"); into("app/tools") }
     from(File(repo, "web")) { include("index.html", "transparent.png", "js/**", "css/**", "vendor/**"); into("app/web") }
     from(File(repo, "LICENSE")) { into("app") }
+    from(File(repo, "android/ffmpeg/license")) { into("app/licenses/ffmpeg") }
     into(layout.buildDirectory.dir("generated/player"))
 }
 tasks.named("preBuild") { dependsOn(copyPlayer) }

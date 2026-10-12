@@ -8,13 +8,15 @@ import threading
 import warnings
 
 
-def start(app_dir, home, data):
+def start(app_dir, home, data, ffmpeg=""):
     # Chaquopy shows ResourceWarning / DeprecationWarning (fork in a threaded process): noise in the build log
     warnings.simplefilter("ignore", ResourceWarning)
     warnings.simplefilter("ignore", DeprecationWarning)
     sys.__stdout__ = sys.stdout  # the launcher echoes its log there: logcat (python.stdout)
     os.environ.update(DANMEMO_APP=app_dir, DANMEMO_HOME=home, DANMEMO_DATA=data,
                       DANMEMO_INPROCESS="1", DANMEMO_NO_BROWSER="1")
+    if ffmpeg and os.path.isfile(ffmpeg):  # the app's own ffmpeg (lib/<abi>/libffmpeg.so): the cutscene movies
+        os.environ["DANMEMO_FFMPEG"] = ffmpeg
     tools = os.path.join(app_dir, "tools")
     if tools not in sys.path:
         sys.path.insert(0, tools)

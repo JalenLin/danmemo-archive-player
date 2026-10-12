@@ -182,7 +182,8 @@ class MainActivity : ComponentActivity() {
             val app = unpack()
             if (!Python.isStarted()) Python.start(AndroidPlatform(this))
             val port = Python.getInstance().getModule("android_main")
-                .callAttr("start", app.absolutePath, filesDir.absolutePath, userFolder.absolutePath).toInt()
+                .callAttr("start", app.absolutePath, filesDir.absolutePath, userFolder.absolutePath,
+                    File(applicationInfo.nativeLibraryDir, "libffmpeg.so").absolutePath).toInt()
             val deadline = System.currentTimeMillis() + 30_000
             while (System.currentTimeMillis() < deadline) {
                 val up = runCatching { Socket().use { it.connect(InetSocketAddress("127.0.0.1", port), 200) } }.isSuccess
