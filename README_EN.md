@@ -18,6 +18,14 @@ Relive the stories of *DanMachi: Memoria Freese* (ダンメモ) in a desktop or 
 - Player: AUTO, SKIP (hold left Ctrl, or toggle), LOG (replay voices), Hide (hide the text box for screenshots: H key or right-click), Settings (text-box colour/opacity, skip delay), continuous playback across a chapter, read marks.
 - Interface in English, Japanese or Chinese (picker at the top right; defaults to your browser's language). Story text stays in the language of the data you built from.
 
+## Screenshots
+
+| Album (official banners and event periods) | Cards | Card details and gacha reveal |
+|---|---|---|
+| ![Album](docs/screenshots/album_en.jpg) | ![Cards](docs/screenshots/cards_en.jpg) | ![Card details](docs/screenshots/card_detail_en.jpg) |
+
+Game images shown are copyright of their respective owners. No game data comes with this project: everything above is built from data you provide yourself.
+
 ## Two ways to set it up
 
 | | Setup A: Japanese memorial app | Setup B: global app-data backup |
