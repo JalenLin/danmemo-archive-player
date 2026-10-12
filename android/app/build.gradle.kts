@@ -31,6 +31,7 @@ android {
         }
     }
     buildTypes {
+        debug { applicationIdSuffix = ".debug" }  // installs next to the release app
         release {
             isMinifyEnabled = false
             signingConfigs.findByName("release")?.let { signingConfig = it }
