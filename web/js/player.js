@@ -607,7 +607,10 @@ export class Player {
   // captions and the message box stay above. (A white 44 'middle' backdrop under the astrea title logo
   // used to sit on top of everything and hid the logo.)
   placeAbove(el, layer) {
-    const above = { background: this.L.mid, middle: this.L.chars, foreground: this.L.fg }[layer] || this.L.fx;
+    let above = { background: this.L.mid, middle: this.L.chars, foreground: this.L.fg }[layer] || this.L.fx;
+    // on the same layer the narration backdrop goes over the tint (38_16: a 30 % black tint left a white
+    // narration card grey; the original shows it white)
+    if (el === this.descBg && this.tintEl.previousElementSibling === above) above = this.tintEl;
     if (el.previousElementSibling !== above) above.after(el);
   }
   async descShow(color, alpha, sec, layer) {
@@ -891,12 +894,25 @@ export class Player {
   // A played-out effect whose last frame covers the whole stage gives way when the scene is rebuilt:
   // Grand Day 18_11 — sword_bb ends on black, then the guild hall and Eina / Misha appear (the original
   // shows them; the player kept the black frame on top of everything)
+  // Does the script go to a fade-out (19) before the scene changes or a line is shown? A full-cover effect
+  // followed by one (title logos: 154 of 182) keeps its last frame for the fade; any other (a *_bb slash
+  // followed by lines, 128×) is a one-second cut and ends with itself (22_03: back to the scene in the original)
+  fadeOutAhead(from) {
+    const cmds = this.novel?.cmds || [];
+    for (let i = from + 1; i < Math.min(cmds.length, from + 25); i++) {
+      const t = cmds[i][0];
+      if (t === 19) return true;
+      if (t === 1 || t === 3 || t === 6 || t === 36 || t === 11 || t === 12 || t === 45) return false;
+    }
+    return false;
+  }
   dropCovers() {
     for (const [i, f] of this.fx) {
       if (!f.once) continue;  // one-shot scenario effects (4)
       // skipping: lines outrun the effect, so play it to its end first (bounded for looping ones)
       if (this.skip) for (let n = 0; n < 30 && f.lwf.rootMovie?.playing; n++) { try { f.lwf.exec(1); } catch (e) { break; } }
-      if (f.lwf.rootMovie?.playing !== false) continue;
+      // still playing: the scene was rebuilt under it, so it goes once it ends on a cover frame
+      if (f.lwf.rootMovie?.playing !== false) { f.rebuilt = true; continue; }
       try { f.lwf.render(); } catch (e) {}
       if (lwfCoverage(f.canvas) > 0.95) { this.fx.delete(i); this.lwfDestroy(f); }
     }
@@ -958,12 +974,14 @@ export class Player {
     else {
       // scenario effects stay until hidden (53 EffectHide), a fade-out, or — one-shots like dagger /
       // graywind / explosion that end on an empty frame — once they have played out
-      f.key = key; f.once = true;
+      f.key = key; f.once = true; f.at = this.pc;
       setTimeout(() => {
         if (this.fx.get(id) !== f || f.lwf.rootMovie?.playing) return;
         if (lwfBlank(f.canvas)) drop();
         // one ending on an opaque full-screen frame (the *_bb slashes end on black, title logos on their
-        // card) stays — a fade-out may follow — until the scene is rebuilt (dropCovers)
+        // card) stays — a fade-out may follow — until the scene is rebuilt (dropCovers); if that already
+        // happened while it played (22_02: dagger_bb, then the forest background), it goes now
+        else if (lwfCoverage(f.canvas) > 0.95 && (f.rebuilt || !this.fadeOutAhead(f.at))) drop();
       }, sec * 1000 + 200);
     }
     await this.wait(sec);

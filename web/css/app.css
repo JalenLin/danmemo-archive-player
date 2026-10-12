@@ -76,7 +76,9 @@ body.playing main { max-width: none; padding: 0; }
 .stage { position: absolute; left: 50%; top: 50%; width: 1280px; height: 720px; overflow: hidden; background: #000; transform-origin: center; user-select: none; cursor: pointer; }
 .layer { position: absolute; inset: 0; isolation: isolate; }  /* z-index set by 38 / 69 stays inside its layer */
 .lwfc { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; pointer-events: none; }
-.img { position: absolute; left: 50%; top: 50%; width: 1280px; height: 720px; object-fit: cover; }
+/* images at their own pixel size, centred (panoramas 4000x720, tall 1280x1440, 1920x1080 close-ups...): checked against the
+   original — 1920x1080 diff 38.5 -> 4.2, 1664x936 21.7 -> 3.9, 1152x1280 19.8 -> 7.2; a 1280x720 box cut panoramas off-screen */
+.img { position: absolute; left: 50%; top: 50%; max-width: none; }
 .char { position: absolute; left: 0; bottom: 0; width: 0; height: 720px; transition: filter .25s;
   transform-origin: 0 100%; }  /* 41 zooms around the feet: matched the original within 2 px (リュー 1.5×, 45_03) */
 .char .pt { position: absolute; bottom: 0; left: 0; transform: translateX(-50%); }
