@@ -68,7 +68,6 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)  // builds take minutes; stories are read
         WindowCompat.setDecorFitsSystemWindows(window, false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -197,6 +196,13 @@ class MainActivity : ComponentActivity() {
     inner class Bridge {
         @JavascriptInterface
         fun pickFolder() = runOnUiThread { runCatching { pickFolder.launch(null) } }
+
+        /** the player's "keep screen on" setting (while a story plays, always, or never) */
+        @JavascriptInterface
+        fun setKeepScreenOn(on: Boolean) = runOnUiThread {
+            if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
     /** a folder from the system picker as a path: "primary:Download/dm" -> /storage/emulated/0/Download/dm,

@@ -5,6 +5,12 @@ import { t } from './i18n.js';
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // per-viewer conveniences (read marks, settings): browser storage, guarded
+// The Android app's "keep screen on" (player settings): 'play' while a story plays (default), 'always', 'off'
+export function keepScreen(playing) {
+  const mode = store.get('dm.keepScreen', 'play');
+  window.DanMemoApp?.setKeepScreenOn?.(mode === 'always' || (mode === 'play' && playing));
+}
+
 export const store = {
   get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
@@ -57,7 +63,7 @@ export function mountPlayer(container, key, opts) {
     if (ctl.player) ctl.player.stop();
     ctl.player = null;
   };
-  ctl.stop = () => { ctl.stopped = true; cleanup(); container.innerHTML = ''; };
+  ctl.stop = () => { ctl.stopped = true; cleanup(); container.innerHTML = ''; keepScreen(false); };
 
   // the browser's full screen (hides Chrome's address bar and the phone's status bar); the Android app is
   // full screen already
@@ -87,7 +93,9 @@ export function mountPlayer(container, key, opts) {
         <label>${t('色')} <input type="color" data-box="msgColor" value="${settings.msgColor ?? BOX.msgColor}"></label>
         <label>${t('不透明度')} <input type="range" min="0" max="1" step="0.05" data-box="msgAlpha" value="${settings.msgAlpha ?? BOX.msgAlpha}"></label>
         <label>${t('SKIP 間隔')} <input type="range" min="30" max="500" step="10" data-box="skipDelay" value="${settings.skipDelay ?? SKIP_DELAY}"> <span data-skipv>${((settings.skipDelay ?? SKIP_DELAY) / 1000).toFixed(2)}</span> ${t('秒')}</label>
-        <button data-box-reset>${t('デフォルト')}</button>
+        <button data-box-reset>${t('デフォルト')}</button>${window.DanMemoApp?.setKeepScreenOn ? `
+        <label>${t('画面を常にオン')} <select data-keep>${[['play', '再生中'], ['always', '常に'], ['off', 'しない']].map(([v, l]) =>
+          `<option value="${v}"${store.get('dm.keepScreen', 'play') === v ? ' selected' : ''}>${t(l)}</option>`).join('')}</select></label>` : ''}
       </div>
       <div class="player-root"></div>${gapNote(novel.gaps)}</div>`;
     const rootEl = container.querySelector('.player-root');
@@ -105,6 +113,9 @@ export function mountPlayer(container, key, opts) {
       if (ctl.player) ctl.player.settings[k] = settings[k];  // the Player keeps its own copy
       applyBox(rootEl, settings);
     });
+    keepScreen(true);
+    const keepSel = panel.querySelector('[data-keep]');
+    if (keepSel) keepSel.onchange = () => { store.set('dm.keepScreen', keepSel.value); keepScreen(true); };
     panel.querySelector('[data-box-reset]').onclick = () => {
       Object.assign(settings, BOX);
       if (ctl.player) Object.assign(ctl.player.settings, BOX);

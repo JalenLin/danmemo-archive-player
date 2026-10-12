@@ -1,5 +1,5 @@
 import { renderChars, renderGacha } from './gallery.js?v=13';
-import { mountPlayer, readSet, store, gapList } from './playerui.js?v=9';
+import { mountPlayer, readSet, store, gapList, keepScreen } from './playerui.js?v=9';
 import { t, period, lang, setLang, LANGS, applyStatic } from './i18n.js';
 
 const view = document.getElementById('view');
@@ -52,6 +52,7 @@ async function route() {
   }
 }
 window.addEventListener('hashchange', route);
+keepScreen(false);  // the Android app: apply "always" from the start
 // Stories whose pictures / movies / portraits / effects no source has are marked wherever they are listed
 // (index.json gaps; the player shows a notice too). They stay playable.
 let GAPS = null;
