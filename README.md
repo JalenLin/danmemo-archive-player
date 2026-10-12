@@ -28,6 +28,10 @@
 
 畫面中的遊戲圖片版權屬於原權利人。本專案不附任何遊戲資料，以上內容都要用你自己準備的資料產生。
 
+## Windows 版（不用安裝 Python）
+
+到 [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) 下載 `DanMemoPlayer-windows.zip`，解壓後執行 `DanMemoPlayer.exe`，在開啟的頁面選擇國際版 APK（或日版紀念版的 `.xapk`）並貼上解壓好的 App 資料備份資料夾，按「開始建置」即可。細節見 zip 裡的 `README.txt`。以下是用原始碼建置的步驟。
+
 ## 需要準備
 
 - Python 3.10 以上；`ffmpeg`（只有轉換過場影片時需要）
@@ -156,6 +160,7 @@ tools/download_extra.py 依清單格式的 JSON 下載額外素材
 tools/usm.py            CRI USM → MP4
 tools/gachanames.py     抽卡演出的名牌圖（build_web.py 會呼叫）
 tools/serve.py          本機伺服器（支援 Range）
+tools/launcher.py       Windows 版的啟動程式：瀏覽器設定頁、自動產生設定、依序建置、提供播放器（packaging/ 是打包設定）
 web/js/i18n.js          介面文字（日文為鍵 → 英文／中文）與日期格式
 tools/smoke.py          播放器自動測試：以快轉模式播放劇情，回報卡住、指令錯誤、素材載入失敗（`smoke.py all --workers 10` 跑全部；Playwright；DANMEMO_URL 指定網址）
 tools/vidcompare.py     對照原作錄影：逐句截圖播放器、和影片逐句對齊，列出畫面差異最大的句子（需要 ffmpeg、Playwright）

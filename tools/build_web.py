@@ -39,8 +39,11 @@ def link_roots():
         if not os.path.isdir(disk):
             print("asset root missing, skipped:", disk)
             continue
-        os.symlink(disk, os.path.join(rdir, str(i)))
-        roots.append((f"r/{i}/", disk.rstrip("/") + "/"))
+        try:
+            os.symlink(disk, os.path.join(rdir, str(i)))
+        except OSError:  # Windows without the symlink right: tools/serve.py maps /r/<i>/ to the root itself
+            pass
+        roots.append((f"r/{i}/", disk.rstrip("/").rstrip("\\") + "/"))
     return roots
 
 

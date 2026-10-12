@@ -10,9 +10,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
     import config
-    WEB = config.load()["web"]
+    _cfg = config.load()
+    WEB, ROOTS = _cfg["web"], _cfg["asset_roots"]
 except SystemExit:  # no config.json yet: serve the bundled player
-    WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "web")
+    WEB, ROOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "web"), []
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -20,8 +21,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                       ".ogg": "audio/ogg", ".webp": "image/webp", ".json": "application/json",
                       ".lwf": "application/octet-stream", ".mp4": "video/mp4", ".js": "text/javascript"}
 
+    web, roots = WEB, ROOTS
+
     def __init__(self, *a, **kw):
-        super().__init__(*a, directory=WEB, **kw)
+        super().__init__(*a, directory=self.web, **kw)
+
+    def translate_path(self, path):
+        # /r/<i>/... is asset root i (build_web.py writes those paths). Mapped here rather than through
+        # web/r/<i> symlinks, which Windows users can't create.
+        m = re.match(r"/r/(\d+)/([^?#]*)", path)
+        if m and int(m.group(1)) < len(self.roots):
+            from urllib.parse import unquote
+            rel = os.path.normpath(unquote(m.group(2))).lstrip("\\/")
+            if not rel.startswith(".."):
+                return os.path.join(self.roots[int(m.group(1))], rel)
+        return super().translate_path(path)
 
     def send_head(self):
         rng = self.headers.get("Range")

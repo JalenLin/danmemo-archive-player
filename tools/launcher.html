@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DanMemo Archive Player — Setup</title>
+<style>
+  :root { --bg: #0b1020; --panel: #151c33; --line: #2a3557; --text: #e8ecf6; --muted: #9aa6c4; --gold: #e6c06a; --ok: #6fd08c; --bad: #ff8a80; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 system-ui, "Segoe UI", "Hiragino Sans", "Microsoft JhengHei", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { color: var(--gold); font-size: 22px; margin: 0 0 4px; }
+  .muted { color: var(--muted); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 14px 0; }
+  .row { display: flex; gap: 10px; align-items: baseline; margin: 4px 0; }
+  .row b { min-width: 9em; color: var(--muted); font-weight: 500; }
+  code { background: #0e1428; padding: 1px 6px; border-radius: 4px; word-break: break-all; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  button { background: var(--gold); color: #1b1407; border: 0; border-radius: 8px; padding: 10px 20px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: default; }
+  a.play { display: inline-block; background: var(--ok); color: #06210f; text-decoration: none; border-radius: 8px; padding: 10px 20px; font-weight: 600; }
+  label { cursor: pointer; }
+  pre { background: #070b16; border: 1px solid var(--line); border-radius: 8px; padding: 10px; height: 320px; overflow: auto; font-size: 12.5px; white-space: pre-wrap; margin: 0; }
+  ul { margin: 6px 0; padding-left: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>DanMemo Archive Player</h1>
+  <div class="muted" data-t="intro"></div>
+
+  <div class="card">
+    <div class="row"><b data-t="datafolder"></b><code id="data"></code></div>
+    <div class="row"><b data-t="apk"></b><span id="apk"></span></div>
+    <div class="row"><b data-t="dump"></b><span id="dump"></span></div>
+    <div class="row"><b>ffmpeg</b><span id="ff"></span></div>
+    <ul id="notes" class="bad"></ul>
+  </div>
+
+  <div class="card">
+    <div class="row"><b data-t="pickapk"></b>
+      <span><input type="file" id="apkfile" accept=".apk,.xapk"> <span id="apkprog" class="muted"></span></span></div>
+    <div class="row"><b data-t="pickdump"></b>
+      <span style="flex:1; display:flex; gap:8px; flex-wrap:wrap">
+        <input type="text" id="dumppath" style="flex:1; min-width:280px; padding:6px 8px; background:#0e1428; color:var(--text); border:1px solid var(--line); border-radius:6px">
+        <button id="dumpok" style="padding:6px 14px" data-t="check"></button>
+      </span></div>
+    <div id="dumpmsg" class="muted" style="margin-left:9.6em"></div>
+    <div class="muted" style="margin-top:6px" data-t="howdump"></div>
+  </div>
+
+  <div class="card">
+    <label><input type="checkbox" id="dl" checked> <span data-t="download"></span></label>
+    <div style="margin-top:12px; display:flex; gap:12px; align-items:center; flex-wrap:wrap">
+      <button id="go"></button>
+      <a class="play" id="play" href="/" style="display:none" data-t="open"></a>
+      <span id="state" class="muted"></span>
+    </div>
+  </div>
+
+  <pre id="log"></pre>
+  <p class="muted" data-t="note"></p>
+</main>
+<script>
+const T = {
+  en: { intro: 'Builds the story player from your own game data. Everything stays on this computer.',
+        datafolder: 'Data folder', apk: 'Keys from', dump: 'App-data backup', none: 'not found',
+        download: 'Download what the backup lacks from the game\'s CDN (about 1.6 GB; event voices and a few images)',
+        build: 'Build', rebuild: 'Rebuild', open: 'Open the player ▶', running: 'Working…', done: 'Ready.', error: 'Stopped — see the log.',
+        ffok: 'found (cutscenes will be converted)', ffno: 'not found (cutscenes are skipped)',
+        note: 'The first build takes about 10–30 minutes. Keep this page and the program window open until it says Ready.',
+        pickapk: 'APK', pickdump: 'Backup folder', check: 'Use this folder', uploading: 'copying…', uploaded: 'saved',
+        howdump: 'Paste the path of the extracted backup (e.g. D:\\danmemo\\contents, or the folder that holds it). Nothing is copied.' },
+  zh: { intro: '用你自己的遊戲資料建置劇情播放器。所有資料都留在這台電腦上。',
+        datafolder: '資料資料夾', apk: '金鑰來源', dump: 'App 資料備份', none: '找不到',
+        download: '從遊戲 CDN 補下載備份缺少的素材（約 1.6 GB，主要是活動語音和少數圖片）',
+        build: '開始建置', rebuild: '重新建置', open: '開啟播放器 ▶', running: '處理中…', done: '完成。', error: '已停止，請看下方記錄。',
+        ffok: '有（會轉換過場影片）', ffno: '沒有（略過過場影片）',
+        note: '第一次建置約 10〜30 分鐘。顯示「完成」之前，請保持這個頁面和程式視窗開著。',
+        pickapk: 'APK', pickdump: '備份資料夾', check: '使用這個資料夾', uploading: '複製中…', uploaded: '已存好',
+        howdump: '貼上解壓後的備份所在路徑（例如 D:\\danmemo\\contents，或它的上一層資料夾）。不會複製檔案。' },
+  ja: { intro: '自分のゲームデータからシナリオプレイヤーを作成します。データはこのパソコンから外に出ません。',
+        datafolder: 'データフォルダ', apk: '鍵の取得元', dump: 'アプリデータのバックアップ', none: '見つかりません',
+        download: 'バックアップに足りない素材をゲームの CDN からダウンロード（約 1.6 GB、主にイベントボイス）',
+        build: '作成', rebuild: '作り直す', open: 'プレイヤーを開く ▶', running: '処理中…', done: '完了。', error: '停止しました。ログを確認してください。',
+        ffok: 'あり（ムービーを変換）', ffno: 'なし（ムービーは省略）',
+        note: '初回は 10〜30 分ほどかかります。「完了」と表示されるまで、このページとプログラムの画面を閉じないでください。',
+        pickapk: 'APK', pickdump: 'バックアップのフォルダ', check: 'このフォルダを使う', uploading: 'コピー中…', uploaded: '保存しました',
+        howdump: '展開したバックアップのパスを貼り付けてください（例：D:\\danmemo\\contents、またはその上のフォルダ）。ファイルはコピーしません。' },
+};
+const nl = (navigator.language || 'en').toLowerCase();
+const L = T[nl.startsWith('zh') ? 'zh' : nl.startsWith('ja') ? 'ja' : 'en'];
+document.querySelectorAll('[data-t]').forEach((e) => (e.textContent = L[e.dataset.t]));
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+$('go').onclick = async () => {
+  $('go').disabled = true;
+  await fetch('/setup/build', { method: 'POST', body: JSON.stringify({ download: $('dl').checked }) });
+  poll();
+};
+$('apkfile').onchange = () => {
+  const f = $('apkfile').files[0]; if (!f) return;
+  const x = new XMLHttpRequest();
+  x.open('POST', '/setup/apk'); x.setRequestHeader('X-File-Name', encodeURIComponent(f.name));
+  x.upload.onprogress = (e) => { if (e.lengthComputable) $('apkprog').textContent = `${L.uploading} ${Math.round(100 * e.loaded / e.total)}%`; };
+  x.onload = () => { $('apkprog').textContent = x.status === 200 ? L.uploaded : x.responseText; poll(); };
+  x.send(f);
+};
+$('dumpok').onclick = async () => {
+  const r = await (await fetch('/setup/dump', { method: 'POST', body: JSON.stringify({ path: $('dumppath').value }) })).json();
+  $('dumpmsg').innerHTML = r.ok ? `<span class="ok">✓ ${esc(r.folder)}</span>` : `<span class="bad">${esc(r.note)}</span>`;
+  poll();
+};
+let lastLog = '';
+async function poll() {
+  const s = await (await fetch('/setup/status')).json();
+  $('data').textContent = s.data;
+  $('apk').innerHTML = s.found.keysrc ? `<code>${esc(s.found.keysrc)}</code>` : `<span class="bad">${L.none}</span>`;
+  $('dump').innerHTML = s.found.dump ? `<code>${esc(s.found.dump)}</code>` : `<span class="bad">${L.none}</span>`;
+  $('ff').innerHTML = s.ffmpeg ? `<span class="ok">${L.ffok}</span>` : `<span class="muted">${L.ffno}</span>`;
+  $('notes').innerHTML = s.found.notes.map((n) => `<li>${esc(n)}</li>`).join('');
+  const ready = s.found.keysrc && s.found.dump;
+  $('go').textContent = s.built ? L.rebuild : L.build;
+  $('go').disabled = !ready || s.state === 'running';
+  $('play').style.display = s.built && s.state !== 'running' ? '' : 'none';
+  $('state').textContent = s.state === 'running' ? `${L.running} ${s.step || ''}` : s.state === 'done' ? L.done : s.state === 'error' ? L.error : '';
+  const log = s.log.join('\n');
+  if (log !== lastLog) { $('log').textContent = log; $('log').scrollTop = 1e9; lastLog = log; }
+  if (s.state === 'running') setTimeout(poll, 1000);
+}
+poll();
+setInterval(() => { if (!$('go').disabled || $('state').textContent === '') poll(); }, 5000);
+</script>
+</body>
+</html>

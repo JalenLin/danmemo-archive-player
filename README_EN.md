@@ -26,6 +26,10 @@ Relive the stories of *DanMachi: Memoria Freese* (ダンメモ) in a desktop or 
 
 Game images shown are copyright of their respective owners. No game data comes with this project: everything above is built from data you provide yourself.
 
+## Windows app (no Python needed)
+
+Download `DanMemoPlayer-windows.zip` from [Releases](https://github.com/JalenLin/danmemo-archive-player/releases), unzip it and run `DanMemoPlayer.exe`. On the page that opens, choose the global APK (or the JP memorial app's `.xapk`), paste the folder of your extracted app-data backup and click Build. See `README.txt` in the zip. The rest of this file describes building from source.
+
 ## Two ways to set it up
 
 | | Setup A: Japanese memorial app | Setup B: global app-data backup |
@@ -223,6 +227,7 @@ tools/download_extra.py  download extra assets listed in a manifest-style JSON
 tools/usm.py             CRI USM → MP4
 tools/gachanames.py      gacha name plates (called by build_web.py)
 tools/serve.py           local server with HTTP Range support
+tools/launcher.py        the Windows app's launcher: setup page in the browser, writes the config, runs the build, serves the player (packaging/ holds the build spec)
 web/js/i18n.js           interface strings (Japanese keys → English / Chinese) and date formats
 tools/smoke.py           player test: plays stories in skip mode and reports hangs, command errors and failed asset loads (`smoke.py all --workers 10` for every story; Playwright; set DANMEMO_URL)
 tools/vidcompare.py      compare with a recording of the original game: screenshot every line, align with the video, list the lines that differ most (ffmpeg, Playwright)

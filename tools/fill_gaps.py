@@ -222,9 +222,12 @@ def convert_movies():
         if DRY:
             print("  would convert", os.path.basename(usm))
             continue
-        res = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "usm.py"), usm, mp4],
-                             capture_output=True, text=True)
-        done += res.returncode == 0 and os.path.exists(mp4)
+        try:
+            import usm as usm_tool
+            usm_tool.convert(usm, mp4)
+        except (OSError, subprocess.CalledProcessError) as e:  # no ffmpeg, or a broken file: the movie stays .usm
+            print("  movie not converted:", os.path.basename(usm), e)
+        done += os.path.exists(mp4)
     return done
 
 

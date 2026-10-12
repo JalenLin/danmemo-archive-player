@@ -26,6 +26,10 @@
 
 画面内のゲーム画像の著作権は各権利者に帰属します。本プロジェクトはゲームデータを含まず、これらはすべてご自身で用意したデータから作成されます。
 
+## Windows 版（Python 不要）
+
+[Releases](https://github.com/JalenLin/danmemo-archive-player/releases) から `DanMemoPlayer-windows.zip` をダウンロードして展開し、`DanMemoPlayer.exe` を実行します。開いたページでグローバル版 APK（またはメモリアル版の `.xapk`）を選び、展開したアプリデータのバックアップのフォルダを貼り付けて「作成」を押してください。詳しくは zip 内の `README.txt` を参照。以下はソースから作る手順です。
+
 ## 必要なもの
 
 - Python 3.10 以上、`ffmpeg`（ムービー変換時のみ）
@@ -154,6 +158,7 @@ tools/download_extra.py  マニフェスト形式の JSON に列挙した素材�
 tools/usm.py             CRI USM → MP4
 tools/gachanames.py      ガチャ演出のネームプレート（build_web.py から呼ばれる）
 tools/serve.py           ローカルサーバー（Range 対応）
+tools/launcher.py        Windows 版のランチャー：ブラウザの設定ページ、設定の自動生成、作成、プレイヤーの提供（packaging/ にビルド設定）
 web/js/i18n.js           画面の文言（日本語をキーに英語／中国語）と日付形式
 tools/smoke.py           プレイヤーのテスト：早送りでシナリオを再生し、停止・コマンドエラー・素材の読み込み失敗を報告（`smoke.py all --workers 10` で全件。Playwright、DANMEMO_URL で URL 指定）
 tools/vidcompare.py      原作の録画と比較：一行ずつスクリーンショットを撮り、動画と対応付けて差の大きい行を一覧にする（ffmpeg・Playwright が必要）

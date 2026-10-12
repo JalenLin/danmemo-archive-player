@@ -12,7 +12,14 @@ import config
 
 WEB = config.load()["web"]  # follow config.json (build_web may be pointed at another output dir)
 OUT = os.path.join(WEB, "data", "gachaname")
-FONT = "/usr/share/fonts/opentype/noto/NotoSansCJK-Black.ttc"
+# a heavy Japanese font: DANMEMO_FONT, else the first one found (Linux / Windows / macOS)
+FONT = next((f for f in [os.environ.get("DANMEMO_FONT", ""),
+                         "/usr/share/fonts/opentype/noto/NotoSansCJK-Black.ttc",
+                         "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+                         os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "YuGothB.ttc"),
+                         os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "meiryob.ttc"),
+                         os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "msgothic.ttc"),
+                         "/System/Library/Fonts/ヒラギノ角ゴシック W8.ttc"] if f and os.path.exists(f)), None)
 W, H = 960, 240
 
 
@@ -87,6 +94,9 @@ def make(title, name, rarity=4):
 def main_from_cards(card_list, only=None):
     """Generate a name plate per card (title + name). `card_list` is the gacha.json card list."""
     os.makedirs(OUT, exist_ok=True)
+    if not FONT:
+        print("no Japanese font found (set DANMEMO_FONT): generated name plates skipped")
+        return
     cards = {str(c["id"]): c for c in card_list}
     ids = only or list(cards)
     n = 0

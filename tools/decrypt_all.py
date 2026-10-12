@@ -35,9 +35,10 @@ def collect(dirs, out):
     return [(f, os.path.join(out, name[:-4] + ".json")) for name, f in sorted(seen.items())]
 
 
-if __name__ == "__main__":
+def main(argv=None):
+    argv = sys.argv if argv is None else argv
     cfg = config.load()
-    lang = sys.argv[sys.argv.index("--lang") + 1] if "--lang" in sys.argv else None
+    lang = argv[argv.index("--lang") + 1] if "--lang" in argv else None
     src = cfg["translations"][lang] if lang else cfg
     dec = cfg["dec"] + (f"_{lang}" if lang else "")
     tasks = collect(src["novel_dirs"], f"{dec}/novel") + collect(src["master_dirs"], f"{dec}/master")
@@ -46,3 +47,8 @@ if __name__ == "__main__":
     print(len(tasks), "files ->", dec, ",", len(errs), "errors")
     for e in errs[:20]:
         print(e)
+    return 1 if errs and len(errs) == len(tasks) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

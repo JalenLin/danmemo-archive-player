@@ -104,7 +104,7 @@ def main():
         except Exception as e:
             print(f"{name}: no match ({e})")
             continue
-        json.dump({"layout": name, **keys}, open(os.path.join(ROOT, "keys.json"), "w"))
+        json.dump({"layout": name, **keys}, open(os.environ.get("DANMEMO_KEYS") or os.path.join(ROOT, "keys.json"), "w"))
         print(f"keys.json written ({name})")
         return 0
     print("No known layout matched this libapp.so.")
