@@ -90,9 +90,9 @@ export async function renderChars(view, getJSON, code) {
       return `<div class="thumb" data-i="${i}"><div class="im">${thumbHTML(it)}</div><div class="cap">${esc(it.key.split('.')[1])}</div></div>`;
     }).join('')}</div>`;
   view.querySelector('.thumbs').onclick = (e) => {
-    const t = e.target.closest('.thumb');
-    if (!t) return;
-    const it = g.items[+t.dataset.i];
+    const el = e.target.closest('.thumb');  // not "t": that is the i18n function used below
+    if (!el) return;
+    const it = g.items[+el.dataset.i];
     let face = it.faces.includes('normal') ? 'normal' : it.faces[0];
     const side = () => `<h3>${esc(it.key.split('.')[1])}</h3><p class="muted">${t('{n} 種類の表情', { n: it.faces.length })}</p>
       <div class="faces">${it.faces.map((f) => `<button class="${f === face ? 'on' : ''}" data-f="${esc(f)}">${esc(f)}</button>`).join('')}</div>`;
@@ -449,8 +449,8 @@ export async function renderGacha(view, getJSON, openId) {
     };
   };
   view.querySelector('.thumbs').onclick = (e) => {
-    const t = e.target.closest('.thumb');
-    if (t) open(cards.find((x) => x.id === +t.dataset.id));
+    const el = e.target.closest('.thumb');
+    if (el) open(cards.find((x) => x.id === +el.dataset.id));
   };
   draw();
   if (openId) { const c = cards.find((x) => x.id === +openId); if (c) open(c); }
