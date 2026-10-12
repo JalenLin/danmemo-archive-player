@@ -12,6 +12,7 @@ DanMemo Archive Player (Windows)
 3. 完成後按「開啟播放器」。之後再開 DanMemoPlayer.exe 會直接進播放器。關掉黑色視窗就結束。
 也可以不用設定頁：把 APK 和解壓好的備份放進 exe 旁邊的 data 資料夾，程式會自己找到。
 產生的金鑰、解密資料和播放器資料都在 work 資料夾，只留在這台電腦。不要分享 work 資料夾。
+建置會寫出上萬個小檔案，Windows Defender 逐一掃描會讓它慢很多；可以在「Windows 安全性 → 病毒與威脅防護 → 排除項目」加入 work 資料夾。
 
 [English]
 1. Unzip and double-click DanMemoPlayer.exe. A log window and a setup page in your browser open.
@@ -25,6 +26,8 @@ DanMemo Archive Player (Windows)
    window to stop. Alternatively put the APK and the extracted backup in the "data" folder next to the exe.
 Keys, decrypted data and the player's data are written to the "work" folder and stay on this computer.
 Don't share the work folder.
+The build writes tens of thousands of small files; Windows Defender scanning each one slows it down a lot.
+Adding the work folder to Defender's exclusions (Windows Security > Virus & threat protection > Exclusions) helps.
 
 [日本語]
 1. zip を展開して DanMemoPlayer.exe をダブルクリック。ログの画面とブラウザの設定ページが開きます。

@@ -42,8 +42,16 @@ def main(argv=None):
     src = cfg["translations"][lang] if lang else cfg
     dec = cfg["dec"] + (f"_{lang}" if lang else "")
     tasks = collect(src["novel_dirs"], f"{dec}/novel") + collect(src["master_dirs"], f"{dec}/master")
-    with ProcessPoolExecutor() as ex:
-        errs = [e for e in ex.map(one, tasks, chunksize=32) if e]
+    workers = os.cpu_count() or 1
+    print(f"decrypting {len(tasks)} files with {workers} processes", flush=True)
+    errs, done = [], 0
+    with ProcessPoolExecutor(workers) as ex:
+        for e in ex.map(one, tasks, chunksize=16):
+            done += 1
+            if e:
+                errs.append(e)
+            if done % 500 == 0 or done == len(tasks):
+                print(f"  {done}/{len(tasks)}", flush=True)
     print(len(tasks), "files ->", dec, ",", len(errs), "errors")
     for e in errs[:20]:
         print(e)
