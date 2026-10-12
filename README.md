@@ -60,7 +60,7 @@ unzip -q apk/split_config.arm64_v8a.apk -d x/lib
     x/pack/assets/master/divide_novel_command_enc/novelCommand751000001.enc
 ```
 
-會產生 `keys.json`（不要分享這個檔案）。目前支援的是紀念版 15.7.2 的 `libapp.so`。
+會產生 `keys.json`（不要分享這個檔案）。支援兩個版本，金鑰相同、日版和國際版資料都能解：紀念版 15.7.2 的 `libapp.so`，以及國際版 2023-12-22 的 APK（`com.eu.danmemo`，和社群資料備份一起分享的那份；直接給 `.apk` 檔即可，會自動取出裡面的 32 位元 `libapp.so`）。只有國際版備份的使用者不需要紀念版，見 [README_EN.md](README_EN.md)。
 
 ### 3. 設定
 

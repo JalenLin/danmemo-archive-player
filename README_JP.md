@@ -56,7 +56,7 @@ unzip -q apk/split_config.arm64_v8a.apk -d x/lib
     x/pack/assets/master/divide_novel_command_enc/novelCommand751000001.enc
 ```
 
-`keys.json` が作成されます（共有しないでください）。対応しているのはメモリアルアプリ 15.7.2 の `libapp.so` です。
+`keys.json` が作成されます（共有しないでください）。対応しているのはメモリアルアプリ 15.7.2 の `libapp.so` と、グローバル版 2023-12-22 の APK（`com.eu.danmemo`、コミュニティのデータバックアップと一緒に共有されているもの。`.apk` をそのまま渡せば中の 32bit `libapp.so` を使います）の 2 つで、鍵は共通です。
 
 ### 3. 設定
 

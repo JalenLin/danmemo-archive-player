@@ -102,6 +102,18 @@ FlatBuffers 裡的字串（`flatbuffers::String`）內容再用 **XXTEA** 加密
   ```
 - 實際用的金鑰：16 bytes ASCII，金鑰是 4 個 little-endian uint32。
 
+### 國際版（com.eu.danmemo 2023-12-22，armeabi-v7a）
+
+金鑰相同，組法也相同（逐字元 `T[S[i] ^ a] ^ b` 附加到字串），只是表格位置和常數不同。找法：程式是 Thumb，沒有 AES 相關的符號；從字串 `master/divide_{}/{}{}`、`encryption/aes_iv` 的 PC 相對參照找到主資料載入程式（`0x143b000` 一帶），反組譯（capstone，要開 skipdata 跳過內嵌資料）找「ldrb [S, i] → eor #a → ldrsb [T, r] → eor b → bl 附加字元 → cmp #長度」的迴圈；附加字元的函式是 `0xb5c73e`，找所有呼叫它的地方就找齊三組：
+
+| 金鑰 | 迴圈 | S | T | a | b |
+|---|---|---|---|---|---|
+| AES key（32） | `0x143ec06` 等 3 處 | `0x260d1c0` | `0x28c26b8` | 0x42 | 0x6e |
+| AES IV（16） | `0x140884e` 等 3 處 | `0x28b9220` | `0x28b91a0` | 0xa8 | 0xdb（`mvn #0x24`） |
+| XXTEA key（16） | `0x14394bc` | `0x28b9230` | `0x28c21c4` | 0x1f | 0x9a（`mvn #0x65`） |
+
+`keys.py` 依 ELF 的 CPU 架構挑版本，再用「IV 開頭是 `uR`」檢查；可以直接給 `.apk`／`.xapk`。
+
 金鑰不寫在程式裡：`tools/keys.py` 會從使用者自己的 `libapp.so` 用上面的公式算出來，存成 `keys.json`（不發布），`tools/dmcrypto.py` 讀取它。
 
 ## 4. 劇情指令格式（novelCommand）
@@ -336,7 +348,7 @@ web/vendor/lwf.js    GREE LWF JavaScript 執行環境（Zlib 授權，附 LWF-LI
 - `contents/1/master/divide_novel_command_enc/` 有 **5,500 個英文劇情檔**，`contents/1/master/divide_enc/` 有 431 個主資料表，還有英文版的 manifest。
 - **和日文版用同一組金鑰**，解開後就是官方英文翻譯：`Bell: I came all the way down to Floor 5. I hope I'll be okay...`
 - 用途：第二階段翻譯的對照或底稿；英文版的素材資料夾也補上了紀念版缺的素材（約 10,577 個檔）。
-- **可以單獨當資料來源**（2026-10 驗證）：dump 結構是 `contents/1..8/files/…`、`contents/1/master/divide_enc|divide_novel_command_enc`、`voice_root`（活動語音已解壓）、`single_image_root`，直接列進 `config.json` 就能建置（5,500 篇、目錄 5,261 篇、784 張卡）。國際版 APK 只有 32 位元 `libapp.so` 且表格不同，`keys.py` 不支援；金鑰相同，改用日版紀念版的 `libapp.so`。缺口：插圖 2,175 處不在國際版、沒有相簿。英文使用者流程寫在 `README_EN.md`。
+- **可以單獨當資料來源**（2026-10 驗證）：dump 結構是 `contents/1..8/files/…`、`contents/1/master/divide_enc|divide_novel_command_enc`、`voice_root`（活動語音已解壓）、`single_image_root`，直接列進 `config.json` 就能建置（5,500 篇、目錄 5,261 篇、784 張卡）。國際版 APK 的 `libapp.so` 是 32 位元（armeabi-v7a，Thumb 程式碼），組金鑰的迴圈和日版相同、表格位置與常數不同；`keys.py` 已支援（見第 3 節），所以只有國際版備份的人不需要紀念版。缺口：插圖 2,175 處不在國際版、沒有相簿。英文使用者流程寫在 `README_EN.md`。
 - 另一份 dump（`contents.part1-6.rar` + 同一份 APK 與 `Directory.txt`）是同一批資料的壓縮版。
 - 相簿：國際版資料沒有 f29/f30，`build_web.py` 內建紀念版的 48 篇清單（`ALBUM_DEFAULT`）套用到國際版的標題、橫幅、劇情；dump 缺最後 9 篇活動的劇情檔，所以是 39 篇。純英文環境（沒有任何日版檔案）實測：解密 0 錯誤、建置正常、抽播 40 篇 0 逾時。
 

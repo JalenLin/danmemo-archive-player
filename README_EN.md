@@ -24,7 +24,7 @@ Relive the stories of *DanMachi: Memoria Freese* (ダンメモ) in a desktop or 
 |---|---|---|
 | Story text | Japanese | **English** (official translation; ~2,700 scripts the global server never translated stay in Japanese) |
 | Voices | Japanese | Japanese |
-| Data you need | the JP memorial app `com.danmemo` (free) + assets from the CDN or a backup | a backup of the global app's data folder (`contents/1` … `contents/8`, …) **plus** `libapp.so` from the JP memorial app, for the keys |
+| Data you need | the JP memorial app `com.danmemo` (free) + assets from the CDN or a backup | a backup of the global app's data folder (`contents/1` … `contents/8`, …) and the global APK of 2023-12-22 (`com.eu.danmemo`, shared with the backup) for the keys — or the JP memorial app's |
 | Album | 48 entries | 48 entries |
 | Cards / gacha reveal | 790 cards; art, reveal and gacha voices only for cards up to Sept. 2019, and only with an old 8.x APK (see below) | 784 cards, all with art, official name plates; lines for 693 |
 
@@ -44,9 +44,17 @@ python3 -m venv venv
 
 The data is encrypted (AES-256-CBC + zlib, strings and numbers with XXTEA). `tools/keys.py` rebuilds the keys from the game's own `libapp.so`; no keys are included here.
 
-**Use the 64-bit `libapp.so` of the Japanese memorial app, version 15.7.2.** The global and Japanese builds use the same keys, so these also decrypt the global data. (The global APK, `com.eu.danmemo`, only contains a 32-bit `libapp.so` with a different layout, which `keys.py` does not support.)
+`keys.py` knows two builds; both use the same keys, so either one decrypts both the Japanese and the global data:
 
-Getting it from a device that has the memorial app installed:
+- **the global APK of 2023-12-22** (`com.eu.danmemo`, the one shared together with the community data backup) — give it the `.apk` itself, it finds the 32-bit `libapp.so` inside:
+  ```bash
+  ./venv/bin/python tools/keys.py com.eu.danmemo_2023-12-22.apk dump/contents/1/master/divide_novel_command_enc/novelCommand751000001.enc
+  ```
+- **the Japanese memorial app 15.7.2** (`com.danmemo`, 64-bit `libapp.so`; only on the Japanese Play Store) — steps below.
+
+Other versions of either app keep their tables elsewhere and are not recognised (`No known layout matched`).
+
+Getting the memorial app's `libapp.so` from a device that has it installed:
 
 ```bash
 mkdir -p apk
@@ -59,7 +67,7 @@ unzip -q apk/split_config.arm64_v8a.apk -d x/lib
 
 If you have the app as an `.xapk` instead, it is a zip containing the same split APKs (`com.danmemo.apk`, `install_pack.apk`, `config.arm64_v8a.apk`); unzip those the same way.
 
-Then derive the keys, checking them against any `novelCommand*.enc` file:
+Then derive the keys, checking them against any `novelCommand*.enc` file (an `.apk`/`.xapk` path works too):
 
 ```bash
 ./venv/bin/python tools/keys.py x/lib/lib/arm64-v8a/libapp.so path/to/novelCommand751000001.enc
