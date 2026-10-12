@@ -781,12 +781,24 @@ export class Player {
       };
       const timer = setTimeout(() => { if (!done) { console.warn('lwf load timeout', key); done = true; lwfLoaded(src); res(null); } }, 20000);
       lwfLoading.set(src, (lwfLoading.get(src) || 0) + 1);
+      // lwf.js drops the whole effect when one texture fails to load. Some titles name a texture no
+      // manifest ever shipped (global gob01_op / so5_op: "…_13.png", "…_7.png"), so load again with the
+      // failed ones swapped for a transparent pixel and keep the rest of the effect.
+      const load = (missing) => {
+        const s = {
+          lwf: file, prefix: dir, stage: canvas, worker: false, useBackgroundColor: false,
+          onload: (lwf) => {
+            const failed = (s.error || []).map((e) => e.url && e.url.slice(e.url.lastIndexOf('/') + 1)).filter((n) => n && !n.endsWith('.lwf'));
+            if (!lwf && !missing && failed.length) { console.warn('lwf textures missing', key, failed); return load(new Set(failed)); }
+            finish(lwf);
+          },
+        };
+        if (missing) s.imageMap = (n) => (missing.has(n) ? new URL('transparent.png', location.href).href : n);
+        LWF.ResourceCache.get().loadLWF(s);
+      };
       try {
         LWF.useCanvasRenderer();
-        LWF.ResourceCache.get().loadLWF({
-          lwf: file, prefix: dir, stage: canvas, worker: false, useBackgroundColor: false,
-          onload: finish,
-        });
+        load(null);
       } catch (e) { console.warn('lwf', key, e); finish(null); }
     });
   }
