@@ -162,7 +162,7 @@ def collect():
     #    gacha-hit voices only exist in the online builds' manifests)
     for r in man_table("pc"):
         cid = r["0"]
-        for f in ("lottery", "white", "all_rectangle", "bustup_s", "status_l", "thumbnail_gacha"):
+        for f in ("lottery", "lottery_upcut", "white", "all_rectangle", "bustup_s", "status_l", "thumbnail_gacha"):
             add(t, f"files/character/lottery/gac_{cid}/{f}.png")
         under(t, f"files/lwf/lotteryLwf/lwf_lottery_ef_{cid}/")
         if r.get("75"):  # gacha-hit voice

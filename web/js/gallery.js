@@ -219,6 +219,39 @@ function cardSide(c, statNames, lb, su) {
     ${c.stories.length ? `<h4>${t('衣装ストーリー')}</h4>${c.stories.map((s) => `<a class="story-link" data-key="${esc(s.novels[0])}" href="#/play/${encodeURIComponent(s.novels[0])}?card=${c.id}">▶ ${esc(s.title)}</a>`).join('')}` : ''}`;
 }
 
+// lwf.js takes only http(s) or "/" URLs in imageMap and loads them itself with new Image(), so a texture
+// prepared on a canvas is handed over by redirecting that image's src to a blob URL.
+const imgRedirect = new Map();
+(() => {
+  const d = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+  Object.defineProperty(HTMLImageElement.prototype, 'src', {
+    configurable: true, enumerable: d.enumerable, get() { return d.get.call(this); },
+    set(v) { const u = String(v); for (const [k, blob] of imgRedirect) if (u.endsWith(k)) { v = blob; break; } d.set.call(this, v); },
+  });
+})();
+// The ★4 close-up (cut_06) shows the two crops stacked in lottery_upcut.png in the opposite order to the
+// original game (legs first, then chest — checked frame by frame against a recording; the Unity client
+// counts texture v from the bottom). Swapping the halves gives the original order and framing.
+const swapped = new Map();
+function swapHalves(url) {
+  if (!swapped.has(url)) {
+    swapped.set(url, new Promise((res) => {
+      const im = new Image();
+      im.onload = () => {
+        const c = document.createElement('canvas'), h = im.height / 2;
+        c.width = im.width; c.height = im.height;
+        const g = c.getContext('2d');
+        g.drawImage(im, 0, h, im.width, h, 0, 0, im.width, h);
+        g.drawImage(im, 0, 0, im.width, h, 0, h, im.width, h);
+        c.toBlob((b) => { if (b) imgRedirect.set(url, URL.createObjectURL(b)); res(); });
+      };
+      im.onerror = () => res();
+      im.src = url;
+    }));
+  }
+  return swapped.get(url);
+}
+
 // Drive a gacha-cut LWF (files/lwf/uiLwf/lottery/<name>). lwf.js renders into a fixed 1280x720 off-DOM
 // buffer, and each frame we blit that buffer onto the visible canvas sized to the letterbox rect.
 // `getRect()` -> {w,h} in CSS px. `map` values must be absolute URLs ("/..."); lwf glues its own prefix
@@ -291,7 +324,7 @@ function gachaShow(c, opKind) {
   const fit = () => { const r = getRect(); cv.style.width = r.w + 'px'; cv.style.height = r.h + 'px'; };
   fit(); const ro = new ResizeObserver(fit); ro.observe(pop);
   const close = () => {
-    video.pause(); if (voice) voice.pause(); if (cut) cut.stop();
+    video.pause(); if (voice) voice.pause(); if (music) music.pause(); if (cut) cut.stop();
     pop.remove(); document.removeEventListener('keydown', key, true); ro.disconnect();
   };
   const key = (e) => { if (e.key === 'Escape') { e.stopImmediatePropagation(); close(); } else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); next(); } };
@@ -299,9 +332,10 @@ function gachaShow(c, opKind) {
   const art = abs(g.art);
   const playVoice = () => { if (g.voice && !voice) { voice = new Audio(g.voice); voice.volume = 1; voice.play().catch(() => {}); } };
   // Reveal sequence: opening movie → rarity-foreshadow waveform (cut_03_flash, colour = rarity) →
-  // the card's line (cut_04_moji, when its image exists) → card reveal (cut_07) with name plate. The gacha-hit voice plays
-  // when the character first appears. Flash cuts are authored full-size (scale 1); card cuts at 0.6.
-  const se = (GMETA.gachaSe || {}), navi = (GMETA.gachaNavi || {});
+  // the card's line (cut_04_moji, when its image exists) → ★4: close-up sweep over the card art (cut_06,
+  // lottery_upcut.png) → card reveal (cut_07) with name plate. Checked against a recording of the original
+  // (10-pull, fqYK1MbRXd8): ★4 has the cut_06 close-up and its fanfare, ★3 / ★2 their own reveal music.
+  const se = (GMETA.gachaSe || {}), navi = (GMETA.gachaNavi || {}), fan = (GMETA.gachaFanfare || {});
   const phases = [];
   if (op) phases.push({ video: op });
   // rarity-foreshadow waveform (colour = rarity) with its "appearance" SE + Anya's navi voice
@@ -309,13 +343,18 @@ function gachaShow(c, opKind) {
   // the card's line (台詞) as a vertical-text image on black (cut_04_moji_3 — the only moji cut the 2019
   // client loads; its bg slot keeps the cut's own black). The gacha-hit voice speaks this line, so it starts here.
   if (g.text) phases.push({ cut: 'argo_gacha_cut_04_moji_3', map: { 'lwf_replace_txt_cut04.png': abs(g.text) }, scale: 0.6, voice: true });
-  phases.push({ cut: `argo_gacha_cut_07_${rar}`, map: {
+  // ★4 close-up: get2 starts here (its quiet 2.6 s intro, then the fanfare runs on under cut_07)
+  const upcut = rar === 4 && (GMETA.gachaCuts || {}).argo_gacha_cut_06_4 && (g.upcut || g.art);
+  if (upcut) phases.push({ cut: 'argo_gacha_cut_06_4', map: { 'lwf_replace_chara_cut06.png': abs(upcut) }, scale: 0.6, voice: true, music: fan.get2,
+    ready: swapHalves(abs(upcut)) });
+  const revealMusic = rar === 4 ? (upcut ? null : fan.get3) : rar === 3 ? fan.get1 : rar === 2 ? se.cha : null;
+  phases.push({ cut: `argo_gacha_cut_07_${rar}`, music: revealMusic, map: {
     'lwf_replace_chara_cut07.png': art,
     'lwf_replace_chara_flash_cut07.png': g.silhouette ? abs(g.silhouette) : art,
     'lwf_replace_chara_name_cut07.png': g.plate ? abs(g.plate) : `/data/gachaname/${c.id}.png`,
   }, scale: 0.6, voice: true, last: true });
 
-  let idx = -1, seAudio = null;
+  let idx = -1, seAudio = null, music = null;
   const run = (i) => {
     if (i <= idx || i >= phases.length) return;
     idx = i;
@@ -323,6 +362,7 @@ function gachaShow(c, opKind) {
     if (ph.voice) playVoice();
     if (ph.se) { try { seAudio = new Audio(ph.se); seAudio.play().catch(() => {}); } catch (e) {} }
     if (ph.navi) { try { const a = new Audio(ph.navi); a.play().catch(() => {}); } catch (e) {} }
+    if (ph.music) { try { if (music) music.pause(); music = new Audio(ph.music); music.play().catch(() => {}); } catch (e) {} }
     if (ph.video) {
       if (cut) { cut.stop(); cut = null; }
       cv.style.display = 'none'; video.classList.remove('hidden');
@@ -331,7 +371,8 @@ function gachaShow(c, opKind) {
     } else {
       video.pause(); video.classList.add('hidden'); cv.style.display = '';
       if (cut) cut.stop();
-      cut = lwfCut(cv, ph.cut, ph.map, getRect, ph.last ? null : () => run(i + 1), ph.scale);
+      const start = () => { if (idx === i) cut = lwfCut(cv, ph.cut, ph.map, getRect, ph.last ? null : () => run(i + 1), ph.scale); };
+      if (ph.ready) ph.ready.then(start); else start();
     }
   };
   const next = () => (idx >= phases.length - 1 ? close() : run(idx + 1));

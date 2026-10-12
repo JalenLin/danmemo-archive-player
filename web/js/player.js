@@ -268,7 +268,7 @@ export class Player {
       // TalkClose doesn't block: in the original the astrea title (4) starts 1 s (the following 15) into
       // a '29 3.0' narration fade — timed by the logo against the effect's 475 frames
       case 29: this.msg.classList.add('hidden'); return this.bg(c, this.narrClear(num(a[0], 0.3)));
-      case 44: return this.descShow(a[0], num(a[1], 0.5), num(a[2], 0.5));
+      case 44: return this.descShow(a[0], num(a[1], 0.5), num(a[2], 0.5), a[3]);
       case 45: return this.narrate(a);
       case 21: return this.titleShow(a[0], a[1]);
 
@@ -579,7 +579,17 @@ export class Player {
     if (first && plain(first[first.length - 1]) === plain(text)) return;
     return this.talk(['', '', '', 'middle', voiceKey, name, text], true);
   }
-  async descShow(color, alpha, sec) {
+  // Screen-wide overlays (50 tint, 44 narration backdrop) go right above the layer they name:
+  // background = bg + middle images, middle = up to the characters, foreground, effect. Narration text,
+  // captions and the message box stay above. (A white 44 'middle' backdrop under the astrea title logo
+  // used to sit on top of everything and hid the logo.)
+  placeAbove(el, layer) {
+    const above = { background: this.L.mid, middle: this.L.chars, foreground: this.L.fg }[layer] || this.L.fx;
+    if (el.previousElementSibling !== above) above.after(el);
+  }
+  async descShow(color, alpha, sec, layer) {
+    this.placeAbove(this.descBg, layer || 'effect');
+    this.fadeStop(this.descBg);  // a 29 still lifting the previous backdrop
     this.descBg.style.background = hex(color, '#000');
     const from = getComputedStyle(this.descBg).opacity;
     await this.anim(this.descBg, [{ opacity: from }, { opacity: alpha }], sec);
@@ -604,9 +614,14 @@ export class Player {
     this.descBg.style.opacity = 0;
     this.msg.classList.add('hidden');
   }
+  // 29 TalkClose also lifts the narration backdrop: every 44 with alpha > 0 is ended by a 29 (1,970×) or a
+  // fade-out (688×), never by a 44 back to 0 — and in the original the scene is lit again after it
   async narrClear(sec) {
-    if (!this.descText.innerHTML) return;
-    await this.fadeTo(this.descText, [{ opacity: 1 }, { opacity: 0 }], sec, () => { this.descText.innerHTML = ''; this.descText.style.opacity = ''; });
+    const bg = getComputedStyle(this.descBg).opacity;
+    const lift = parseFloat(bg) > 0
+      ? this.fadeTo(this.descBg, [{ opacity: bg }, { opacity: 0 }], sec) : null;
+    if (!this.descText.innerHTML) return lift;
+    await Promise.all([lift, this.fadeTo(this.descText, [{ opacity: 1 }, { opacity: 0 }], sec, () => { this.descText.innerHTML = ''; this.descText.style.opacity = ''; })]);
   }
   async narrate(a) {
     const [color, , pos, , voice, size, text] = a;
@@ -637,10 +652,7 @@ export class Player {
   // the narration, captions and the message box always stay above it
   async tint(color, alpha, sec, layer) {
     if (color) this.tintEl.style.background = color;
-    if (layer) {
-      const above = { background: this.L.mid, middle: this.L.chars, foreground: this.L.fg }[layer] || this.L.fx;
-      if (this.tintEl.previousElementSibling !== above) above.after(this.tintEl);
-    }
+    if (layer) this.placeAbove(this.tintEl, layer);
     const from = getComputedStyle(this.tintEl).opacity;
     await this.anim(this.tintEl, [{ opacity: from }, { opacity: alpha }], sec);
     this.tintEl.getAnimations().forEach((x) => x.cancel());
@@ -715,6 +727,30 @@ export class Player {
         this.setFilter(l, 'cm', `url(#${id})`);
       });
     }
+    if (type === 'gradient_multiplier') {
+      // [wait, s, type, colour A, colour B, "x:y" A, "x:y" B] — colours in %, y in % from the bottom: A at
+      // its y and above, blending linearly (sRGB) to B at its y. Measured on the original (45_22, the
+      // Evilus meeting): black at 80 % height fading to 50 % grey at the bottom, multiplied in.
+      const col = (v, d) => (v || d).split(':').map((x) => Math.round(2.55 * num(x, 100))).slice(0, 3).join(',');
+      const yOf = (v, d) => { const n = String(v || '').split(':').map(Number).filter((x) => !isNaN(x)); return n.length ? n[n.length - 1] : d; };
+      let ya = yOf(a[5], 80), yb = yOf(a[6], 0);
+      if (ya === yb) { ya = 80; yb = 0; }
+      const grad = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><defs><linearGradient id="g" x1="0" x2="0" y1="${1 - ya / 100}" y2="${1 - yb / 100}"><stop offset="0" stop-color="rgb(${col(a[3], '0:0:0')})"/><stop offset="1" stop-color="rgb(${col(a[4], '100:100:100')})"/></linearGradient></defs><rect width="${W}" height="${H}" fill="url(#g)"/></svg>`;
+      layers.forEach((l) => {
+        const id = `gm-${l.dataset.l || 'x'}`;
+        let f = this.defs.querySelector('#' + id);
+        if (!f) {
+          f = document.createElementNS('http://www.w3.org/2000/svg', 'filter'); f.id = id;
+          f.setAttribute('color-interpolation-filters', 'sRGB'); f.setAttribute('filterUnits', 'userSpaceOnUse');
+          f.setAttribute('x', 0); f.setAttribute('y', 0); f.setAttribute('width', W); f.setAttribute('height', H);
+          f.innerHTML = `<feImage result="g" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="none"/>
+            <feBlend in="SourceGraphic" in2="g" mode="multiply" result="m"/><feComposite in="m" in2="SourceGraphic" operator="in"/>`;
+          this.defs.appendChild(f);
+        }
+        f.firstElementChild.setAttribute('href', 'data:image/svg+xml,' + encodeURIComponent(grad));
+        this.setFilter(l, 'gm', `url(#${id})`);
+      });
+    }
     await this.wait(num(sec));
   }
   async peEnd(a) {
@@ -724,6 +760,7 @@ export class Player {
       if (type === 'color_multiplier' || type === 'custom_color_correction' || !type) this.setFilter(l, 'cm', null);
       if (type === 'sepia' || !type) this.setFilter(l, 'sepia', null);
       if (type === 'grayscale' || !type) this.setFilter(l, 'grayscale', null);
+      if (type === 'gradient_multiplier' || !type) this.setFilter(l, 'gm', null);
     }
     await this.wait(num(sec));
   }

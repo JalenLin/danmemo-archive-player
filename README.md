@@ -150,6 +150,7 @@ tools/gachanames.py     抽卡演出的名牌圖（build_web.py 會呼叫）
 tools/serve.py          本機伺服器（支援 Range）
 web/js/i18n.js          介面文字（日文為鍵 → 英文／中文）與日期格式
 tools/smoke.py          播放器自動測試：以快轉模式播放劇情，回報卡住、指令錯誤、素材載入失敗（`smoke.py all --workers 10` 跑全部；Playwright；DANMEMO_URL 指定網址）
+tools/vidcompare.py     對照原作錄影：逐句截圖播放器、和影片逐句對齊，列出畫面差異最大的句子（需要 ffmpeg、Playwright）
 tools/shot.py           播放器截圖（同上）
 tools/gdrive_ls.py / gdrive_get.py  列出／下載公開的 Google Drive 資料夾
 tools/wayback_get.py    下載 Wayback Machine 收錄的日版公告圖與公告頁（研究用）

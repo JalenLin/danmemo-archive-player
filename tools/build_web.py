@@ -715,9 +715,14 @@ def main():
             # where each reveal cut lives (asset roots differ per setup; an app-data backup splits them up)
             "gachaCuts": {n: c.rsplit("/", 1)[0] + "/" for n in
                           [f"argo_gacha_cut_03_flash_{r}" for r in (2, 3, 4)] + [f"argo_gacha_cut_07_{r}" for r in (1, 2, 3, 4)]
-                          + ["argo_gacha_cut_04_moji_3"]
+                          + ["argo_gacha_cut_04_moji_3", "argo_gacha_cut_06_4"]
                           if (c := find(f"files/lwf/uiLwf/lottery/{n}/{n}.lwf"))},
             "gachaSe": {k: find(f"files/sound/se/ui/se_ui_gacha_{k}.ogg") for k in ("syuppin", "syuppin2", "cha", "dooropen")},
+            # card-reveal music, matched against a recording of the original: ★2 "cha", ★3 get1, ★4 get2 from
+            # the upcut close-up (cut_06; a quiet 2.6 s intro, then the fanfare under cut_07) or get3 = the same
+            # fanfare without the intro. The files sit in bgm/ or se/ui/ depending on the client version.
+            "gachaFanfare": {k: find(f"files/sound/bgm/bgm_fanfare_gacha_{k}.ogg") or find(f"files/sound/se/ui/bgm_fanfare_gacha_{k}.ogg")
+                             for k in ("get1", "get2", "get3")},
             # Anya (navi) rarity-foreshadow voice played over the waveform flash; longer = higher rarity.
             "gachaNavi": {"2": find("files/sound/voice/arn/voice_sys_gacha_arn_03.ogg"),
                           "3": find("files/sound/voice/arn/voice_sys_gacha_arn_04.ogg"),
@@ -889,6 +894,7 @@ def build_cards(stage_novels):
             "lotteryImg": find(rel + "lottery.png"),
             # gacha reveal (art/upcut from the global backup's CDN paths, voice = Japanese original)
             "gacha": {"art": find(rel + "lottery.png"), "silhouette": find(rel + "white.png"),
+                      "upcut": find(rel + "lottery_upcut.png"),  # ★4 close-up sweep (cut_06)
                       "voice": gacha_voice(r.get("75")),
                       # official name plate: the global client ships an English one per card; for JP
                       # only the early cards' survive (fill_gaps.py → name_jp/). Otherwise

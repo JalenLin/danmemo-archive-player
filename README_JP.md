@@ -148,6 +148,7 @@ tools/gachanames.py      ガチャ演出のネームプレート（build_web.py 
 tools/serve.py           ローカルサーバー（Range 対応）
 web/js/i18n.js           画面の文言（日本語をキーに英語／中国語）と日付形式
 tools/smoke.py           プレイヤーのテスト：早送りでシナリオを再生し、停止・コマンドエラー・素材の読み込み失敗を報告（`smoke.py all --workers 10` で全件。Playwright、DANMEMO_URL で URL 指定）
+tools/vidcompare.py      原作の録画と比較：一行ずつスクリーンショットを撮り、動画と対応付けて差の大きい行を一覧にする（ffmpeg・Playwright が必要）
 tools/shot.py            スクリーンショット（同上）
 tools/gdrive_ls.py, gdrive_get.py   公開 Google Drive フォルダの一覧／ダウンロード
 tools/wayback_get.py     Wayback Machine にある日本版お知らせ画像・ページの取得（調査用）

@@ -268,12 +268,12 @@ remoteManifestUrl: {}/manifests/jp/png/project.manifest.1/0880e4f102c7a71c775762
 | 59 / 68 | LwfRotate / LwfMove | … / lwf, 實例, x, y, 秒, relative, 緩動曲線 | ✔ |
 | 57 / 69 / 70 | LwfFlip / LwfZOrder / LwfParent | 翻轉 X/Y / 前後值（負值在角色後方）/ add, image\|chara, 對象 | ✔ 改成設定特效屬性（原本都在中央重建一個實例） |
 | 60–63 | AnimationText Set/Show/Move/Remove | id, 座標, 錨點, **對齊**(center/left/right), 色, 字級, 文字 | ✔ 字幕、片尾名單捲動 |
-| 64 / 65 / 66 | PostEffectGroupSet / Start / End | 圖層(background/middle/background_middle/…_effect/all), **指定立繪**… / 類型 | ✔ blur、color_multiplier、custom_color_correction（SVG 矩陣）、sepia、grayscale；✘ gradient_multiplier（210 次）、rim_light（161 次） |
+| 64 / 65 / 66 | PostEffectGroupSet / Start / End | 圖層(background/middle/background_middle/…_effect/all), **指定立繪**… / 類型 | ✔ blur、color_multiplier、custom_color_correction（SVG 矩陣）、sepia、grayscale、**gradient_multiplier**（色 A, 色 B, "x:y" A, "x:y" B：y 是離底部的百分比，A 以上全是 A、往下線性漸變到 B，乘到圖層上；SVG feImage 漸層＋feBlend multiply，再用原圖 alpha 遮罩。對照原作 45_22 逐列量亮度比：80% 高度全黑、底部 50%，sRGB 線性）；✘ rim_light（161 次） |
 | 71 / 74 | BattleSimulate / CompleteMission | | 忽略 |
 
 文字標記只有振假名一種：`[r=よみ]漢字[/r]`。
 
-**參數稽核（2026-10-12）**：對全部劇情統計每個指令每個參數位置的出現比例和常見值，再對照播放器實際讀的參數，找出上表標粗體的那些（資料裡有、播放器沒讀或讀錯）。還沒處理、需要原作錄影確認的：45 旁白可能是整段淡入（a[3] 秒）而不是逐字；1 的 a[4] 可能是「不等淡入結束」；32／44 的圖層參數；52、57、42 的部分參數；65 的過渡秒數與 gradient_multiplier、rim_light。**哪些指令會等待**（對照原作錄影 D1tl1fthSMQ）：1／3（圖片淡入）、6／7（角色出現、消失）會等待：45_01 背景交叉淡入 1.0 秒時對話框先關閉、淡完才出下一句；第一次換場原作全黑 4.05 秒，等於劇本的 15 2.0＋6 0.5＋1 1.0 再加執行與載入時間。27／41（角色移動、縮放）不等待：45_03 シャクティ 的 20 秒鏡頭移動在後面的台詞期間持續進行。29（關閉對話）不等待：アストレア・レコード 標題 Logo 在旁白淡出 3 秒的第 1 秒就開始（用 Logo 完整顯示的時段對齊特效的 475 格推算，特效結束時間與原作淡出時間相差 0.2 秒）。4 會等特效播完（空白參數＝等待）。2、36 維持等待（未有錄影反證）。曾經根據「後面常接同秒數的 15」的統計把 1／6 改成不等待，對照錄影後證實錯誤、已改回：這個統計不能當作證據。淡入淡出統一由 `fadeTo` 處理（新的取代舊的，被取代或被場景重置取消的不再套用結束狀態）。
+**參數稽核（2026-10-12）**：對全部劇情統計每個指令每個參數位置的出現比例和常見值，再對照播放器實際讀的參數，找出上表標粗體的那些（資料裡有、播放器沒讀或讀錯）。還沒處理、需要原作錄影確認的：45 旁白可能是整段淡入（a[3] 秒）而不是逐字；1 的 a[4] 可能是「不等淡入結束」；32／44 的圖層參數；52、57、42 的部分參數；65 的過渡秒數與 rim_light。**哪些指令會等待**（對照原作錄影 D1tl1fthSMQ）：1／3（圖片淡入）、6／7（角色出現、消失）會等待：45_01 背景交叉淡入 1.0 秒時對話框先關閉、淡完才出下一句；第一次換場原作全黑 4.05 秒，等於劇本的 15 2.0＋6 0.5＋1 1.0 再加執行與載入時間。27／41（角色移動、縮放）不等待：45_03 シャクティ 的 20 秒鏡頭移動在後面的台詞期間持續進行。29（關閉對話）不等待：アストレア・レコード 標題 Logo 在旁白淡出 3 秒的第 1 秒就開始（用 Logo 完整顯示的時段對齊特效的 475 格推算，特效結束時間與原作淡出時間相差 0.2 秒）。4 會等特效播完（空白參數＝等待）。2、36 維持等待（未有錄影反證）。曾經根據「後面常接同秒數的 15」的統計把 1／6 改成不等待，對照錄影後證實錯誤、已改回：這個統計不能當作證據。淡入淡出統一由 `fadeTo` 處理（新的取代舊的，被取代或被場景重置取消的不再套用結束狀態）。
 
 LWF 缺貼圖：lwf.js 只要有一張貼圖載入失敗就整個特效不顯示。國際版 4 篇的標題特效引用了任何清單都沒有的貼圖，標題整段黑畫面：
 
@@ -387,6 +387,8 @@ MP = pc[54] + Σ_{l=1..L} pcLevelStep(群組 pc[47], l)[10] + 英雄昇華累計
 - **抽卡演出**：オフライン版沒有收錄，從英文版 Google Drive 備份的清單找到 CDN 上的實際檔案補齊（素材共用、以 MD5 定址，`contents/...` JP/EN 相同）：
   - 開場影片 `files/movie/{argo,another}_gacha_op_0{2,3,4}.usm`（依稀有度）。USM 音訊有 ADX（檔頭 0x8000）和 HCA 兩種，`tools/usm.py` 依檔頭自動判斷。
   - 演出動畫是遊戲自己的一套 LWF：`files/lwf/uiLwf/lottery/argo_gacha_cut_0{3,4,6,7}_*`，角色圖、名牌、台詞是可替換貼圖（`lwf_replace_*`，用 lwf.js 的 imageMap 替換；data: URL 會被加前綴而失效，替換圖要用 `/` 開頭的絕對路徑或 `/transparent.png` 遮掉）。本專案用 cut_07（登場）＋替換卡圖 `lottery.png`、剪影 `white.png`，名牌貼圖遮成透明、改用畫面疊的日文版。 lwf.js 的 Canvas 渲染會參考 canvas 的顯示尺寸，所以**不能用 CSS transform 縮放 canvas**（會被二次放大、只剩中間）；改成把 backing 設成實際裝置像素（CSS 尺寸 × devicePixelRatio）、用 `property.scaleTo` 讓 LWF 自己縮放，高 DPI 螢幕才正確。
+  - **演出順序與音樂**（對照原作十連抽錄影 fqYK1MbRXd8 確認）：開場影片 → cut_03_flash_<稀有度>（聲波，+`se_ui_gacha_syuppin(2)` 與 アーニャ 語音）→ cut_04_moji_3（台詞直書圖）→ **★4：cut_06_4 特寫**（`lottery_upcut.png` 上下兩段裁切圖依序橫移，約 2.7 秒）→ cut_07_<稀有度> 登場。音樂用音訊互相關比對影片找出：★2 登場 `se_ui_gacha_cha`、★3 登場 `bgm_fanfare_gacha_get1`、★4 在特寫開始時播 `bgm_fanfare_gacha_get2`（前 2.6 秒是安靜的前奏，正好接上登場）；`get3` 是同一首去掉前奏的版本，沒有特寫時才用。cut_06 曾被誤判為「英雄祭專用、非標準 ★4」而拿掉，錄影證實 ★4（超激レア）都有。
+  - cut_06 的特寫圖兩段在 lwf.js 裡順序相反（原作先腿後胸；推測 Unity 的貼圖 v 軸由下往上）：播放前把 `lottery_upcut.png` 上下兩半對調，順序與構圖就和原作一致。lwf.js 的 imageMap 只收 http(s)／`/` 網址，所以處理過的圖用 blob URL，在 Image 載入時轉址交給它。
   - 每張卡的抽卡圖 `lottery.png`、剪影 `white.png`、語音 `pc[75]` 都下載回來（772／759／649 張）。**語音確認是日文**：和日文版同名檔逐位元相同（比對 401 個 MD5 全同）。
   - **限制**：cut 動畫的稀有度橫幅（ULTIMATE 等）烤在 EN 貼圖裡，是英文；台詞字幕 JP 版在任何已有資料都沒有（voice.enc 無台詞文字、繁中清單拿不到、EN 的是英文圖），故不顯示字幕。
 
@@ -474,7 +476,8 @@ MP = pc[54] + Σ_{l=1..L} pcLevelStep(群組 pc[47], l)[10] + 英雄昇華累計
 - [x] 角色語音、情人節企劃、租借角色番外、預告／據點劇情配對（第 18 節）
 - [x] 相簿擴充（其他活動、降臨、復刻），劇情目錄只留沒有期間的回合（第 19 節）
 - [x] 影片頁、抽卡台詞（moji cut）
-- [ ] gradient_multiplier、rim_light 濾鏡
+- [x] gradient_multiplier 濾鏡
+- [ ] rim_light 濾鏡
 - [ ] 找 8.2.0 之後、轉新制之前的最後一版日版 APK（可補 2019-09 以後的日文橫幅、名牌、台詞）
 - [ ] 日版缺的素材：劇情開場標題 Logo 34 組（只有國際版有，日文原版找不到）、語音約 1,100 句、CG 約 140 張
 - [ ] 戰鬥語音（`ba_*`，約 2,700 句）沒有列出

@@ -209,6 +209,7 @@ tools/gachanames.py      gacha name plates (called by build_web.py)
 tools/serve.py           local server with HTTP Range support
 web/js/i18n.js           interface strings (Japanese keys → English / Chinese) and date formats
 tools/smoke.py           player test: plays stories in skip mode and reports hangs, command errors and failed asset loads (`smoke.py all --workers 10` for every story; Playwright; set DANMEMO_URL)
+tools/vidcompare.py      compare with a recording of the original game: screenshot every line, align with the video, list the lines that differ most (ffmpeg, Playwright)
 tools/shot.py            screenshots (same)
 tools/gdrive_ls.py, gdrive_get.py   list / download a public Google Drive folder
 tools/wayback_get.py     download JP notice art and pages known to the Wayback Machine (research)
