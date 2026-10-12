@@ -1,4 +1,4 @@
-import { renderChars, renderGacha } from './gallery.js?v=11';
+import { renderChars, renderGacha } from './gallery.js?v=12';
 import { mountPlayer, readSet, store } from './playerui.js?v=8';
 import { t, period, lang, setLang, LANGS, applyStatic } from './i18n.js';
 

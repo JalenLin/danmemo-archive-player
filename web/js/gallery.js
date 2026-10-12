@@ -109,7 +109,7 @@ export async function renderChars(view, getJSON, code) {
 }
 
 const stars = (n) => '★'.repeat(Math.max(0, Math.min(n || 0, 9)));
-const nl = (t) => esc(t).replace(/\r?\n/g, '<br>');
+const nl = (s) => esc(s).replace(/\r?\n/g, '<br>');
 
 // Stats exactly as the memorial app's キャラ詳細 (max rank): verified against in-app screens.
 function cardStats(c, lb, su) {
@@ -157,13 +157,13 @@ function startFx(fxUrl) {
     lwf = l;
     l.property.moveTo(FXW / 2, FXH / 2);
     let t0 = performance.now();
-    const step = (t) => { if (!alive) return; l.exec((t - t0) / 1000); t0 = t; l.render(); requestAnimationFrame(step); };
+    const step = (now) => { if (!alive) return; l.exec((now - t0) / 1000); t0 = now; l.render(); requestAnimationFrame(step); };
     requestAnimationFrame(step);
   } });
 }
 function grade(c, i, v) {
-  const t = (c.kind === 'assist' ? GMETA.gradeAssist : GMETA.gradeNormal)[i];
-  for (const [g, min] of t) if (v >= min) return g;
+  const table = (c.kind === 'assist' ? GMETA.gradeAssist : GMETA.gradeNormal)[i];
+  for (const [g, min] of table) if (v >= min) return g;
   return 12;
 }
 const gradeImg = (g) => GMETA.gradeIcon ? `<img class="grade" alt="${GMETA.gradeNames[g]}" title="${GMETA.gradeNames[g]}" src="${GMETA.gradeIcon.replace(/evaluation_1\.png$/, `evaluation_${g}.png`)}">` : GMETA.gradeNames[g];
@@ -288,10 +288,10 @@ function lwfCut(canvas, name, map, getRect, onEnd, scale = 1) {
         ctx.drawImage(buf, 0, 0, 1280, 720, 0, 0, bw, bh);
       };
       let t0 = performance.now(), ended = false;
-      const step = (t) => {
+      const step = (now) => {
         if (!alive) return;
         if (!ended) {
-          l.exec((t - t0) / 1000); t0 = t; l.render();
+          l.exec((now - t0) / 1000); t0 = now; l.render();
           if (total && l.rootMovie.currentFrame >= total - 1) { ended = true; onEnd && onEnd(l); }
         }
         blit();

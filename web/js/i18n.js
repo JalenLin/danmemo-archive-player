@@ -35,7 +35,6 @@ const D = {
   'その他のシナリオ': ['Other Scenarios', '其他劇情'],
   'エンドクレジット': ['End Credits', '片尾名單'],
   'ムービー': ['Movies', '影片'],
-  'ボイス': ['Voices', '語音'],
   'その他のイベント': ['Other Events', '其他活動'],
   '復刻イベント': ['Reruns', '復刻活動'],
   '内容が初回と異なる復刻イベント（新しい順）。': ['Reruns whose content differs from the first run (newest first).', '內容和首次舉辦不同的復刻活動（由新到舊）。'],
