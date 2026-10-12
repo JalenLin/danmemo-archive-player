@@ -10,10 +10,12 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.DocumentsContract
 import android.provider.Settings
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -29,6 +31,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import org.json.JSONObject
 import java.io.File
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -51,6 +54,11 @@ class MainActivity : ComponentActivity() {
     private val pickFile = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         fileCallback?.onReceiveValue(uri?.let { arrayOf(it) })
         fileCallback = null
+    }
+    // the setup page's "choose folder" (the backup): the system folder picker, turned into a file path for Python
+    private val pickFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        val path = uri?.let { treePath(it) } ?: ""
+        web.evaluateJavascript("window.__appFolder && window.__appFolder(${JSONObject.quote(path)})", null)
     }
     private val legacyPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { asking = false; maybeStart() }
@@ -79,6 +87,7 @@ class MainActivity : ComponentActivity() {
             allowFileAccess = false
             userAgentString = "$userAgentString DanMemoApp"  // the player hides its full-screen button
         }
+        web.addJavascriptInterface(Bridge(), "DanMemoApp")  // only our own pages load here (others open outside)
         web.webViewClient = object : WebViewClient() {
             // the player stays in the app; other links (GitHub, …) open in the browser
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
@@ -183,6 +192,22 @@ class MainActivity : ComponentActivity() {
             }
             runOnUiThread { web.loadUrl("http://127.0.0.1:$port/") }
         }
+    }
+
+    inner class Bridge {
+        @JavascriptInterface
+        fun pickFolder() = runOnUiThread { runCatching { pickFolder.launch(null) } }
+    }
+
+    /** a folder from the system picker as a path: "primary:Download/dm" -> /storage/emulated/0/Download/dm,
+     *  "1A2B-3C4D:dm" (an SD card) -> /storage/1A2B-3C4D/dm. Readable as a path with all-files access. */
+    private fun treePath(uri: Uri): String? {
+        if (uri.authority != "com.android.externalstorage.documents") return null
+        val id = DocumentsContract.getTreeDocumentId(uri)
+        val vol = id.substringBefore(":")
+        val rel = id.substringAfter(":", "")
+        val base = if (vol.equals("primary", ignoreCase = true)) Environment.getExternalStorageDirectory().path else "/storage/$vol"
+        return if (rel.isEmpty()) base else "$base/$rel"
     }
 
     /** assets/app (tools/ and web/) -> files/app, again after each app update */
