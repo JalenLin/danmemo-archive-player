@@ -64,6 +64,10 @@ function lwfLoaded(src) {
   for (const l of later) lwfFree(src, l);
 }
 
+// share of the stage an effect's canvas covers opaquely (sampled)
+function lwfCoverage(c) {
+  try { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let a = 0, n = 0; for (let i = 3; i < d.length; i += 400) { n++; if (d[i] > 240) a++; } return a / n; } catch (e) { return 0; }
+}
 function lwfBlank(c) {
   try { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 64) if (d[i] > 8) return false; return true; } catch (e) { return false; }
 }
@@ -132,7 +136,9 @@ export class Player {
           this.lwfPlace(f);
           if (p >= 1) f.tw = null;
         }
-        try { f.lwf.exec(dt); f.lwf.render(); } catch (e) { /* ignore broken effect */ }
+        // while skipping, effects run 10x so one-shots end with the lines flying past (a *_bb slash still
+        // playing when the scene is rebuilt would otherwise end on its black frame over everything)
+        try { f.lwf.exec(this.skip ? dt * 10 : dt); f.lwf.render(); } catch (e) { /* ignore broken effect */ }
       }
       requestAnimationFrame(tick);
     };
@@ -233,6 +239,7 @@ export class Player {
 
   async exec(c) {
     const [t, ...a] = c;
+    if (t === 1 || t === 3 || t === 6 || t === 36) this.dropCovers();
     switch (t) {
       // Image and portrait fades block (checked against the original recording, 45_01: the dialogue box
       // waits for a 1.0 s background crossfade; the black gap before a fade-in includes 6's 0.5 s and 1's
@@ -340,12 +347,25 @@ export class Player {
       const src = this.res(key);
       if (src) el.src = src;
       st = this.images[key] = { el, x: 0, y: 0, s: 1, r: 0 };
+      // the clamp in xf needs the image size: re-place once it is known (unless a move is animating)
+      el.addEventListener('load', () => { if (!el.getAnimations().length) el.style.transform = this.xf(st); });
     }
     if (reset) Object.assign(st, { x: 0, y: 0, s: 1, r: 0 });
     this.applyXform(st);
     return st;
   }
-  xf(st) { return `translate(-50%,-50%) translate(${st.x}px,${-st.y}px) scale(${st.s}) rotate(${st.r}deg)`; }
+  // 23 positions are absolute, but the original keeps an image covering the stage: the offset is clamped to
+  // what the scaled image allows (59_21: zoom 3 at y -600, then 1.3 at y +600 → bottom edge on the screen
+  // edge, grass line at row 504 vs 520 predicted; without the clamp the image left the screen)
+  xf(st) {
+    const w = st.el.naturalWidth, h = st.el.naturalHeight;
+    let { x, y } = st;
+    if (w && h) {
+      const mx = Math.max(0, (w * st.s - W) / 2), my = Math.max(0, (h * st.s - H) / 2);
+      x = Math.max(-mx, Math.min(mx, x)); y = Math.max(-my, Math.min(my, y));
+    }
+    return `translate(-50%,-50%) translate(${x}px,${-y}px) scale(${st.s}) rotate(${st.r}deg)`;
+  }
   applyXform(st) { st.el.getAnimations().forEach((a) => a.cancel()); st.el.style.transform = this.xf(st); }
   async imageXform(key, ch, sec, easing) {
     const st = this.imageState(key);
@@ -362,8 +382,11 @@ export class Player {
     layer.appendChild(st.el);
     layer._top = st.el;
     const dur = trans === 'immediately' ? 0 : sec;
+    // Images on a layer stack: hiding the top one (2) shows the one under it again — Grand Day 18_12 puts
+    // black1 over the guild hall on the background layer, hides it, and the hall is back (it used to be
+    // removed here, leaving black). Only the oldest beyond a few are dropped.
     await this.fadeTo(st.el, [{ opacity: getComputedStyle(st.el).opacity }, { opacity: 1 }], dur,
-      () => old.forEach((e) => e !== layer._top && e.remove()));  // not one that was shown again meanwhile
+      () => old.slice(0, Math.max(0, old.length - 4)).forEach((e) => e !== layer._top && e.remove()));
   }
   async imageHide(key, sec) {
     const st = this.images[key];
@@ -755,7 +778,9 @@ export class Player {
   }
   async peEnd(a) {
     const [, sec, type] = a;
-    for (const l of Object.values(this.L)) {
+    // layers and portraits: a 64 naming portraits puts the effect on those elements (47_55: Alfia lit
+    // white by color_multiplier 1000 stayed white after the 66 that ends it)
+    for (const l of [...Object.values(this.L), ...Object.values(this.chars).map((st) => st.el)]) {
       if (type === 'blur' || !type) this.setFilter(l, 'blur', null);
       if (type === 'color_multiplier' || type === 'custom_color_correction' || !type) this.setFilter(l, 'cm', null);
       if (type === 'sepia' || !type) this.setFilter(l, 'sepia', null);
@@ -863,6 +888,19 @@ export class Player {
     const host = kind === 'chara' ? this.chars[target]?.el : this.images[target]?.el;
     if (host && host.parentNode) host.parentNode.insertBefore(f.canvas, host.nextSibling);
   }
+  // A played-out effect whose last frame covers the whole stage gives way when the scene is rebuilt:
+  // Grand Day 18_11 — sword_bb ends on black, then the guild hall and Eina / Misha appear (the original
+  // shows them; the player kept the black frame on top of everything)
+  dropCovers() {
+    for (const [i, f] of this.fx) {
+      if (!f.once) continue;  // one-shot scenario effects (4)
+      // skipping: lines outrun the effect, so play it to its end first (bounded for looping ones)
+      if (this.skip) for (let n = 0; n < 30 && f.lwf.rootMovie?.playing; n++) { try { f.lwf.exec(1); } catch (e) { break; } }
+      if (f.lwf.rootMovie?.playing !== false) continue;
+      try { f.lwf.render(); } catch (e) {}
+      if (lwfCoverage(f.canvas) > 0.95) { this.fx.delete(i); this.lwfDestroy(f); }
+    }
+  }
   lwfDestroy(f) { lwfFree(f.src, f.lwf); f.canvas.remove(); }
   fxId(key, label) { return key + '#' + (label || ''); }
   fxGet(key, label) {
@@ -920,8 +958,13 @@ export class Player {
     else {
       // scenario effects stay until hidden (53 EffectHide), a fade-out, or — one-shots like dagger /
       // graywind / explosion that end on an empty frame — once they have played out
-      f.key = key;
-      setTimeout(() => { if (this.fx.get(id) === f && !f.lwf.rootMovie?.playing && lwfBlank(f.canvas)) drop(); }, sec * 1000 + 200);
+      f.key = key; f.once = true;
+      setTimeout(() => {
+        if (this.fx.get(id) !== f || f.lwf.rootMovie?.playing) return;
+        if (lwfBlank(f.canvas)) drop();
+        // one ending on an opaque full-screen frame (the *_bb slashes end on black, title logos on their
+        // card) stays — a fade-out may follow — until the scene is rebuilt (dropCovers)
+      }, sec * 1000 + 200);
     }
     await this.wait(sec);
   }

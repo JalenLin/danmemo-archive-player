@@ -42,6 +42,7 @@ def _capture(job):
             pg.goto("about:blank")  # a hash change alone keeps the previous story's player around
             pg.goto(f"{BASE}#/play/{key}")
             pg.wait_for_function(f"window.__p && window.__p.novel && window.__p.novel.key === {json.dumps(key)}", timeout=20000)
+            pg.add_style_tag(content=".gapnote { display: none !important; }")  # the missing-asset notice isn't part of the scene
             cmds = pg.evaluate("__p.novel.cmds")
             # hold the player after every typed line until the screenshot is taken
             pg.evaluate("""(() => { const p = window.__p, orig = p.typeInto.bind(p);

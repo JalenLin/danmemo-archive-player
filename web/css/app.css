@@ -353,3 +353,9 @@ table.stat img.grade { height: 20px; vertical-align: middle; }
 .notices { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; padding: 6px 4px 10px; margin-bottom: 4px; border-bottom: 1px dashed var(--line); font-size: 14px; }
 .notices a { color: var(--gold-2); }
 .notices a.read { opacity: .6; }
+
+/* assets no source has: notice over the stage, marker in the lists */
+.gapnote { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); z-index: 8; max-width: min(90%, 760px);
+  padding: 8px 14px; border-radius: 8px; background: rgba(40, 28, 8, .92); border: 1px solid var(--gold); color: #f3e3b5;
+  font-size: 14px; line-height: 1.5; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.5); }
+a.gap::after { content: '⚠'; margin-left: 6px; color: var(--gold); font-size: .85em; opacity: .85; }

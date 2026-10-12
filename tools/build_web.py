@@ -47,6 +47,12 @@ def link_roots():
 ROOTS = link_roots()
 VOICE = {}
 GACHA_VOICE_ALIAS = {}
+# Cards whose line image exists but whose pc field 75 is empty in both the JP and the global master data;
+# the recording is there, unassigned. Matched by transcribing the character's unassigned gachahit voices
+# (Whisper) against the card's line: 夕涼聖女 "聖女とは一体……恥ずかしい！", 白巫女 "レフィーヤ。この魔法を
+# お前に託す。", 鏡花水月 "まずは武器を集めてこないと". Every other card with a line has its voice.
+CARD_VOICE_FIX = {1011043006: "voice.sys_gachahit_amd_16", 1011019001: "voice.sys_gachahit_fil_04",
+                  1011014002: "voice.sys_gachahit_cgs_05"}
 
 
 def gacha_voice(f75):
@@ -388,6 +394,9 @@ def main():
     movie_refs = collections.defaultdict(list)  # movie_usm key -> [(novel id, novel key)] for the movie page
     lines = {}  # novel key -> its dialogue, to recognise rerun copies
     missing = collections.Counter()
+    gaps = {}  # novel key -> {kind: count} of assets no source has (shown in the player and the lists)
+    GAP_KIND = {"single_image": "img", "movie_usm": "movie", "novel_portrait": "chara", "scenario_lwf": "fx",
+                "battle_effect": "fx", "voice": "voice", "bgm": "sound", "se": "sound"}
     for f in sorted(glob.glob(f"{DEC}/novel/*.json")):
         cmds = json.load(open(f))["0"]
         nid = cmds[0]["1"]
@@ -410,8 +419,11 @@ def main():
                         res[tok] = r
                         if r is None:
                             missing[tok.split(".")[0]] += 1
-        json.dump({"key": key, "title": title, "cmds": out, "res": res},
-                  open(f"{WEB}/data/novel/{key}.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+        g = collections.Counter(GAP_KIND[t.split(".")[0]] for t, v in res.items() if v is None and t.split(".")[0] in GAP_KIND)
+        doc = {"key": key, "title": title, "cmds": out, "res": res}
+        if g:
+            doc["gaps"] = gaps[key] = dict(g)
+        json.dump(doc, open(f"{WEB}/data/novel/{key}.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
         novels[key] = title
         lines[key] = tuple(c[-1] for c in out if c[0] in (11, 12, 45) and len(c) > 1)
         if INTERACTION_RE.match(key):
@@ -639,7 +651,11 @@ def main():
           "chars": find("files/character/lottery/gac_1011003022/all_rectangle.png"),
           "cards": find("files/character/lottery/gac_1011001027/status_l.png"),
           "credits_bg": img.get("65980080")}
-    json.dump({"tree": tree, "titles": novels, "ui": ui}, open(f"{WEB}/data/index.json", "w", encoding="utf-8"),
+    # stories whose pictures / movies / portraits / effects no source has (the list marks them; voices and sounds
+    # alone don't count: the scene still plays)
+    shown_gaps = {k: v for k, v in gaps.items() if any(x in v for x in ("img", "movie", "chara", "fx"))}
+    print("stories with missing pictures/movies/portraits/effects", len(shown_gaps), "| with any gap", len(gaps))
+    json.dump({"tree": tree, "titles": novels, "ui": ui, "gaps": shown_gaps}, open(f"{WEB}/data/index.json", "w", encoding="utf-8"),
               ensure_ascii=False, separators=(",", ":"))
     json.dump({g: sorted(v) for g, v in sorted(others.items())}, open(f"{WEB}/data/others.json", "w", encoding="utf-8"),
               ensure_ascii=False, separators=(",", ":"))
@@ -895,7 +911,7 @@ def build_cards(stage_novels):
             # gacha reveal (art/upcut from the global backup's CDN paths, voice = Japanese original)
             "gacha": {"art": find(rel + "lottery.png"), "silhouette": find(rel + "white.png"),
                       "upcut": find(rel + "lottery_upcut.png"),  # ★4 close-up sweep (cut_06)
-                      "voice": gacha_voice(r.get("75")),
+                      "voice": gacha_voice(r.get("75") or CARD_VOICE_FIX.get(r["0"])),
                       # official name plate: the global client ships an English one per card; for JP
                       # only the early cards' survive (fill_gaps.py → name_jp/). Otherwise
                       # gachanames.py draws one from the card data

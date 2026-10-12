@@ -47,6 +47,10 @@ def run(job):
                 pg.goto(f"{BASE}#/play/{k}")
                 pg.wait_for_function("window.__p && window.__p.novel", timeout=20000)
                 n = pg.evaluate("__p.novel.cmds.length")
+                # the stage must fill the player (a CSS slip once left it a strip behind the toolbar)
+                box = pg.evaluate("(() => { const r = document.querySelector('.stage').getBoundingClientRect(); return [r.width, r.height]; })()")
+                if box[0] < 600 or box[1] < 300:
+                    r["errors"].append(f"layout: stage {box[0]:.0f}x{box[1]:.0f}")
                 pg.evaluate("__p.setSkip(true)")
                 pg.wait_for_selector(".endcard", timeout=int(60000 + n * 60))
             except Exception as e:

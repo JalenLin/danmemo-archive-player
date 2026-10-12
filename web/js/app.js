@@ -1,5 +1,5 @@
-import { renderChars, renderGacha } from './gallery.js?v=12';
-import { mountPlayer, readSet, store } from './playerui.js?v=8';
+import { renderChars, renderGacha } from './gallery.js?v=13';
+import { mountPlayer, readSet, store, gapList } from './playerui.js?v=9';
 import { t, period, lang, setLang, LANGS, applyStatic } from './i18n.js';
 
 const view = document.getElementById('view');
@@ -52,6 +52,21 @@ async function route() {
   }
 }
 window.addEventListener('hashchange', route);
+// Stories whose pictures / movies / portraits / effects no source has are marked wherever they are listed
+// (index.json gaps; the player shows a notice too). They stay playable.
+let GAPS = null;
+function markGaps() {
+  if (!GAPS) return;
+  view.querySelectorAll('a[href*="#/play/"]:not([data-gapchk])').forEach((a) => {
+    a.dataset.gapchk = '1';
+    const k = decodeURIComponent((a.getAttribute('href').split('#/play/')[1] || '').split('?')[0]);
+    if (!GAPS[k]) return;
+    a.classList.add('gap');
+    a.title = t('素材欠落：{list}', { list: gapList(GAPS[k]) });
+  });
+}
+getJSON('data/index.json').then((i) => { GAPS = i.gaps || {}; markGaps(); }).catch(() => {});
+new MutationObserver(markGaps).observe(view, { childList: true, subtree: true });
 // interface language: header picker; re-render the current page in the new language
 const langSel = document.querySelector('.top .lang');
 if (langSel) {

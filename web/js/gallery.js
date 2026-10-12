@@ -1,5 +1,5 @@
 // Character portrait and card galleries.
-import { playerPopup } from './playerui.js?v=8';
+import { playerPopup } from './playerui.js?v=9';
 import { t } from './i18n.js';
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 

@@ -1,5 +1,5 @@
 // Player page UI (toolbar, keys, log, end card) shared by the full-page player and popups.
-import { Player, rubyHTML, SKIP_DELAY } from './player.js?v=8';
+import { Player, rubyHTML, SKIP_DELAY } from './player.js?v=9';
 import { t } from './i18n.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -79,8 +79,10 @@ export function mountPlayer(container, key, opts) {
         <label>${t('SKIP 間隔')} <input type="range" min="30" max="500" step="10" data-box="skipDelay" value="${settings.skipDelay ?? SKIP_DELAY}"> <span data-skipv>${((settings.skipDelay ?? SKIP_DELAY) / 1000).toFixed(2)}</span> ${t('秒')}</label>
         <button data-box-reset>${t('デフォルト')}</button>
       </div>
-      <div class="player-root"></div></div>`;
+      <div class="player-root"></div>${gapNote(novel.gaps)}</div>`;
     const rootEl = container.querySelector('.player-root');
+    const note = container.querySelector('.gapnote');
+    if (note) { note.onclick = () => note.remove(); setTimeout(() => note.remove(), 9000); }
     const bar = container.querySelector('.player-bar');
     const panel = container.querySelector('.boxpanel');
     applyBox(rootEl, settings);
@@ -195,6 +197,17 @@ export function mountPlayer(container, key, opts) {
   };
   open(key);
   return ctl;
+}
+
+/** "画像 2 ・ ボイス 5": what a story lacks (build_web.py's gaps: assets no configured source has) */
+export function gapList(g) {
+  const L = [['img', '画像 {n}'], ['movie', '動画 {n}'], ['chara', '立ち絵 {n}'], ['fx', 'エフェクト {n}'], ['voice', 'ボイス {n}'], ['sound', 'BGM・効果音 {n}']];
+  return L.filter(([k]) => g && g[k]).map(([k, s]) => t(s, { n: g[k] })).join(' ・ ');
+}
+// a notice over the stage at the start of a story some of whose pictures / movies / portraits / effects are lost
+function gapNote(g) {
+  if (!g || !['img', 'movie', 'chara', 'fx'].some((k) => g[k])) return '';
+  return `<div class="gapnote">${esc(t('このシナリオの素材の一部は、現存するどのデータにも含まれていないため表示されません：{list}', { list: gapList(g) }))}</div>`;
 }
 
 /** Play in a full-screen popup over the current page; closing returns to it. */
