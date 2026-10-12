@@ -175,7 +175,7 @@ def index_dir(rel_dirs, ext):
             for dp, _, fs in os.walk(base):
                 for f in fs:
                     if f.endswith(ext):
-                        idx.setdefault(f[: -len(ext)], web + os.path.relpath(os.path.join(dp, f), disk))
+                        idx.setdefault(f[: -len(ext)], web + os.path.relpath(os.path.join(dp, f), disk).replace(os.sep, "/"))
     return idx
 
 
