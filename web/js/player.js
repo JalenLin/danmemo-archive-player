@@ -46,6 +46,24 @@ function easeFn(v) {  // the same curves as functions of t in [0,1]
 }
 export const SKIP_DELAY = 120;  // default ms per line while skipping (user-adjustable)
 // true when an effect canvas has nothing visible left (sampled)
+// lwf.js drops a URL's cache entry when its last instance is destroyed; a load of that URL still
+// waiting for textures then throws inside the library (reading z$Wa of the dropped entry) and never
+// calls onload. So destroying an instance waits until no load of its URL is in flight.
+const lwfLoading = new Map();   // src → loads in flight
+const lwfDeferred = new Map();  // src → instances to destroy once those loads finish
+function lwfFree(src, lwf) {
+  if (lwfLoading.get(src)) { if (!lwfDeferred.has(src)) lwfDeferred.set(src, []); lwfDeferred.get(src).push(lwf); return; }
+  try { lwf.destroy(); } catch (e) {}
+}
+function lwfLoaded(src) {
+  const n = (lwfLoading.get(src) || 1) - 1;
+  if (n) { lwfLoading.set(src, n); return; }
+  lwfLoading.delete(src);
+  const later = lwfDeferred.get(src) || [];
+  lwfDeferred.delete(src);
+  for (const l of later) lwfFree(src, l);
+}
+
 function lwfBlank(c) {
   try { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 64) if (d[i] > 8) return false; return true; } catch (e) { return false; }
 }
@@ -149,6 +167,22 @@ export class Player {
   setSkip(v) { this.skip = v; if (v) this.click(); }
   d(sec) { return this.skip ? 0 : Math.max(0, sec) * 1000; }
   wait(sec) { const ms = this.d(sec); return ms ? sleep(ms) : Promise.resolve(); }
+  bg(c, p) { Promise.resolve(p).catch((e) => console.warn('cmd failed', c, e)); }
+  // Opacity transitions don't block the script any more, so they can overlap on one element: a newer
+  // one replaces the older, and only the current one (not replaced, not cancelled by a scene reset)
+  // pins its end value and runs `done`.
+  fadeTo(el, frames, sec, done) {
+    el._fade?.cancel();
+    const a = el.animate(frames, { duration: this.d(sec) || 1, fill: 'forwards', easing: 'ease-in-out' });
+    el._fade = a;
+    return a.finished.then(() => {
+      if (el._fade !== a) return;
+      el._fade = null;
+      el.style.opacity = frames[frames.length - 1].opacity; a.cancel();
+      if (done) done();
+    }, () => {});
+  }
+  fadeStop(el) { if (el._fade) { el._fade.cancel(); el._fade = null; } }
   anim(el, frames, sec, extra = {}) {
     const ms = this.d(sec);
     const a = el.animate(frames, { duration: ms || 1, fill: 'forwards', easing: 'ease-in-out', ...extra });
@@ -200,6 +234,10 @@ export class Player {
   async exec(c) {
     const [t, ...a] = c;
     switch (t) {
+      // Image and portrait fades block (checked against the original recording, 45_01: the dialogue box
+      // waits for a 1.0 s background crossfade; the black gap before a fade-in includes 6's 0.5 s and 1's
+      // 1.0 s — 4.05 s in the original). Character moves / zooms (27, 41) don't: シャクティ's 20 s pan
+      // in 45_03 runs on under the following lines.
       case 1: return this.imageShow(a[0], a[1] || 'background', a[2], num(a[3], 0.5));
       case 2: return this.imageHide(a[0], a[2] === 'immediately' ? 0 : num(a[3], 0.5));
       case 3: return this.imageShow(a[0], a[1] || 'foreground', a[2], num(a[3], 0.5));
@@ -216,10 +254,10 @@ export class Player {
       case 7: return this.charShowHide(a, false);
       case 39: return this.charFace(a[0], a[1]);
       case 10: return this.charFocus(a[0], a[1]);
-      case 27: return this.charMove(a[0], num(a[1]), num(a[2]), num(a[3]), a[4] !== 'absolute', cssEase(a[5]));
+      case 27: return this.bg(c, this.charMove(a[0], num(a[1]), num(a[2]), num(a[3]), a[4] !== 'absolute', cssEase(a[5])));
       // reaction nudge: change face and jolt the portrait by (x,y) with an overshoot bounce
       case 8: return this.manpu(a[0], num(a[1]), num(a[2]), a[4]);  // emotion mark [portrait, dx, dy, ?, mark, over]
-      case 41: return this.charScale(a[0], num(a[1], 1), num(a[2]), cssEase(a[3]));
+      case 41: return this.bg(c, this.charScale(a[0], num(a[1], 1), num(a[2]), cssEase(a[3])));
       case 9: return this.charHop(a[0]);
       case 38: { const st = this.charState(a[0]); st.el.style.zIndex = String(1000 + Math.round(num(a[1]))); return; }  // CharacterZOrder
       case 49: return this.charRotate(a[0], num(a[1]), num(a[2]));  // CharacterRotate [portrait, degrees, s]
@@ -227,7 +265,9 @@ export class Player {
       case 11: return this.talk(a, true);
       case 12: return this.talk(a, false);
       case 14: return this.selection(a);
-      case 29: this.msg.classList.add('hidden'); return this.narrClear(num(a[0], 0.3));
+      // TalkClose doesn't block: in the original the astrea title (4) starts 1 s (the following 15) into
+      // a '29 3.0' narration fade — timed by the logo against the effect's 475 frames
+      case 29: this.msg.classList.add('hidden'); return this.bg(c, this.narrClear(num(a[0], 0.3)));
       case 44: return this.descShow(a[0], num(a[1], 0.5), num(a[2], 0.5));
       case 45: return this.narrate(a);
       case 21: return this.titleShow(a[0], a[1]);
@@ -235,10 +275,11 @@ export class Player {
       case 15: return this.wait(num(a[0]));
       // 51 releases the 50 tint (221 times the previous screen command is a 50) over a[0] s
       case 51: { const p = this.tint(null, 0, num(a[0])); return a[1] === 'wait' ? p : undefined; }
-      case 19: return this.fade(hex(a[1], '#000'), 1, num(a[0], 0.5)).then(() => this.sceneReset());  // a[1]: colour (ffffff ×1284)
-      case 20: return this.fade(null, 0, num(a[0], 0.5));
+      // blank seconds = 1.0 (measured in the original: [19] 1.0 s, [20] 1.0 s ×3 in 45_01)
+      case 19: return this.fade(hex(a[1], '#000'), 1, num(a[0], 1)).then(() => this.sceneReset());  // a[1]: colour (ffffff ×1284)
+      case 20: return this.fade(null, 0, num(a[0], 1));
       // 50 [colour, layer, seconds, opacity, wait]: e.g. "10.0 1.0" = darken over 10 s, "1.0 0.5" = half-dark
-      case 50: { const p = this.tint(hex(a[0]), num(a[3], 1), num(a[2])); return a[4] === 'wait' ? p : undefined; }
+      case 50: { const p = this.tint(hex(a[0]), num(a[3], 1), num(a[2]), a[1]); return a[4] === 'wait' ? p : undefined; }
       case 32: { const p = this.flash(hex(a[0], '#fff'), num(a[2]), num(a[3]), num(a[4])); return a[5] === 'no_wait' ? undefined : p; }
       case 52: { const p = this.flash(hex(a[0], '#fff'), num(a[3]), 0, num(a[4]), num(a[2], 1)); return a[5] === 'wait' ? p : undefined; }
       case 16: { const tgt = (a[0] === 'character' || a[0] === 'image') && a[1] ? a[0] + '/' + a[1] : a[0]; return this.quake(tgt, num(a[2], 10), num(a[3], num(a[2], 10)), num(a[4], 0.5)); }  // amp X, amp Y
@@ -261,7 +302,9 @@ export class Player {
 
       case 17: return this.playMovie(a[0], a[1] === 'skip_enable');
       // EffectShow [key, x, y, wait, 'fade', fadeSec, rotation]
-      case 4: { const p = this.lwfOnce(a[0], num(a[1], 640), num(a[2], 360), num(a[6]), a[4] === 'fade' ? num(a[5]) : 0); return a[3] === 'wait' ? p : undefined; }
+      // waits unless 'no_wait' (written out 16,050×, so blank — 688× — is the waiting default; the
+      // astrea_record title logo plays in full before the fade-out in the original)
+      case 4: { const p = this.lwfOnce(a[0], num(a[1], 640), num(a[2], 360), num(a[6]), a[4] === 'fade' ? num(a[5]) : 0); return a[3] === 'no_wait' ? undefined : p; }
       // EffectHide: ends the scenario effect(s) started by 4 (EffectShow) — 1413/1434 uses follow one
       case 53: { const p = this.effectHide(a[0], a[2] === 'fade' ? num(a[3]) : 0); return a[4] === 'wait' ? p : undefined; }
       case 54: return this.lwfSet(a[0], a[1], num(a[2], 640), num(a[3], 360));
@@ -317,17 +360,15 @@ export class Player {
     const layer = this.layerOf(layerName);
     const old = [...layer.children].filter((e) => e !== st.el);
     layer.appendChild(st.el);
+    layer._top = st.el;
     const dur = trans === 'immediately' ? 0 : sec;
-    await this.anim(st.el, [{ opacity: getComputedStyle(st.el).opacity }, { opacity: 1 }], dur);
-    st.el.style.opacity = 1;
-    old.forEach((e) => e.remove());
+    await this.fadeTo(st.el, [{ opacity: getComputedStyle(st.el).opacity }, { opacity: 1 }], dur,
+      () => old.forEach((e) => e !== layer._top && e.remove()));  // not one that was shown again meanwhile
   }
   async imageHide(key, sec) {
     const st = this.images[key];
     if (!st || !st.el.parentNode) return;
-    await this.anim(st.el, [{ opacity: 1 }, { opacity: 0 }], sec);
-    st.el.remove();
-    st.el.style.opacity = 0;
+    await this.fadeTo(st.el, [{ opacity: getComputedStyle(st.el).opacity }, { opacity: 0 }], sec, () => st.el.remove());
   }
 
   // ---------------------------------------------------------------- characters
@@ -404,8 +445,8 @@ export class Player {
     const fade = st.vis ? 0 : num(a[5], 0);
     st.x = from ?? to; this.charPlace(st);
     st.vis = true;
-    const fadeIn = fade > 0 ? this.anim(st.el, [{ opacity: 0 }, { opacity: 1 }], fade).then(() => { st.el.getAnimations().forEach((x) => x.cancel()); st.el.style.opacity = 1; })
-      : (st.el.style.opacity = 1, Promise.resolve());
+    const fadeIn = fade > 0 ? this.fadeTo(st.el, [{ opacity: 0 }, { opacity: 1 }], fade)
+      : (this.fadeStop(st.el), st.el.style.opacity = 1, Promise.resolve());
     await Promise.all([fadeIn, from !== null ? this.charMove(key, to, 0, sec, false) : null]);
   }
   async charShowHide(a, show) {
@@ -422,7 +463,7 @@ export class Player {
         frames[show ? 0 : 1].translate = `${dx}px 0`;
         frames[show ? 1 : 0].translate = '0 0';
       }
-      return this.anim(st.el, frames, sec).then(() => { st.el.getAnimations().forEach((x) => x.cancel()); st.el.style.opacity = show ? 1 : 0; });
+      return this.fadeTo(st.el, frames, sec);
     }));
   }
   async charMove(key, x, y, sec, relative, easing) {
@@ -481,15 +522,18 @@ export class Player {
   async talk(a, waitTap) {
     const [portrait, face, vis, , voice, name, text] = a;
     const isP = portrait && portrait.startsWith('novel_portrait');
-    // a[2]==='off' means the speaker is off-screen for this line: hide their portrait (so a middle
-    // CG shows cleanly); otherwise they speak on-screen, so show them.
+    // a[2] blank: the speaker is brought on screen if not there yet. 'off' (19,527 lines with a portrait):
+    // leave the portrait as it is — hidden stays hidden (an off-screen speaker), shown stays shown.
+    // Checked against the original: リュー shouting with 'off' while zoomed in stays on screen, and the
+    // speaker's focus (others dimmed) works the same as on a blank line. Hiding her was wrong.
+    let on = false;
     if (isP) {
       this.charFace(portrait, face);
       const st = this.charState(portrait);
-      st.vis = vis !== 'off';
-      st.el.style.opacity = st.vis ? 1 : 0;
+      if (vis !== 'off' && !st.vis) { this.fadeStop(st.el); st.vis = true; st.el.style.opacity = 1; }
+      on = st.vis;
     }
-    this.autoFocus(isP && vis !== 'off' ? portrait : null);
+    this.autoFocus(on ? portrait : null);
     if (this.descText.innerHTML) this.descText.innerHTML = '';
     this.msg.classList.remove('hidden');
     this.msg.classList.toggle('noname', !name);
@@ -562,13 +606,12 @@ export class Player {
   }
   async narrClear(sec) {
     if (!this.descText.innerHTML) return;
-    await this.anim(this.descText, [{ opacity: 1 }, { opacity: 0 }], sec);
-    this.descText.getAnimations().forEach((x) => x.cancel());
-    this.descText.innerHTML = '';
+    await this.fadeTo(this.descText, [{ opacity: 1 }, { opacity: 0 }], sec, () => { this.descText.innerHTML = ''; this.descText.style.opacity = ''; });
   }
   async narrate(a) {
     const [color, , pos, , voice, size, text] = a;
     this.msg.classList.add('hidden');
+    this.fadeStop(this.descText); this.descText.style.opacity = '';  // a 29 still fading the previous text
     this.descText.style.color = hex(color, '#fff');
     this.descText.style.fontSize = num(size, 30) + 'px';
     this.descText.dataset.pos = pos || 'middle';
@@ -590,8 +633,14 @@ export class Player {
   }
 
   // ---------------------------------------------------------------- screen
-  async tint(color, alpha, sec) {
+  // layer as with 64: background = bg + middle images, middle = up to the characters, foreground, effect;
+  // the narration, captions and the message box always stay above it
+  async tint(color, alpha, sec, layer) {
     if (color) this.tintEl.style.background = color;
+    if (layer) {
+      const above = { background: this.L.mid, middle: this.L.chars, foreground: this.L.fg }[layer] || this.L.fx;
+      if (this.tintEl.previousElementSibling !== above) above.after(this.tintEl);
+    }
     const from = getComputedStyle(this.tintEl).opacity;
     await this.anim(this.tintEl, [{ opacity: from }, { opacity: alpha }], sec);
     this.tintEl.getAnimations().forEach((x) => x.cancel());
@@ -724,13 +773,21 @@ export class Player {
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H; canvas.className = 'lwfc';
     return new Promise((res) => {
+      let done = false;
+      const finish = (lwf) => {
+        if (done) { if (lwf) lwfFree(src, lwf); return; }  // arrived after the timeout
+        done = true; clearTimeout(timer); lwfLoaded(src);
+        res(lwf ? { lwf, canvas, key, src, x: 640, y: 360, rot: 0 } : null);
+      };
+      const timer = setTimeout(() => { if (!done) { console.warn('lwf load timeout', key); done = true; lwfLoaded(src); res(null); } }, 20000);
+      lwfLoading.set(src, (lwfLoading.get(src) || 0) + 1);
       try {
         LWF.useCanvasRenderer();
         LWF.ResourceCache.get().loadLWF({
           lwf: file, prefix: dir, stage: canvas, worker: false, useBackgroundColor: false,
-          onload: (lwf) => res(lwf ? { lwf, canvas, key, x: 640, y: 360, rot: 0 } : null),
+          onload: finish,
         });
-      } catch (e) { console.warn('lwf', key, e); res(null); }
+      } catch (e) { console.warn('lwf', key, e); finish(null); }
     });
   }
   lwfPlace(f) {
@@ -757,7 +814,7 @@ export class Player {
     const host = kind === 'chara' ? this.chars[target]?.el : this.images[target]?.el;
     if (host && host.parentNode) host.parentNode.insertBefore(f.canvas, host.nextSibling);
   }
-  lwfDestroy(f) { try { f.lwf.destroy(); } catch (e) {} f.canvas.remove(); }
+  lwfDestroy(f) { lwfFree(f.src, f.lwf); f.canvas.remove(); }
   fxId(key, label) { return key + '#' + (label || ''); }
   fxGet(key, label) {
     return this.fx.get(this.fxId(key, label)) || [...this.fx.values()].find((f) => f.key === key);

@@ -74,10 +74,11 @@ body.playing main { max-width: none; padding: 0; }
 .player-root { position: relative; flex: 1; overflow: hidden; }
 
 .stage { position: absolute; left: 50%; top: 50%; width: 1280px; height: 720px; overflow: hidden; background: #000; transform-origin: center; user-select: none; cursor: pointer; }
-.layer { position: absolute; inset: 0; }
+.layer { position: absolute; inset: 0; isolation: isolate; }  /* z-index set by 38 / 69 stays inside its layer */
 .lwfc { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; pointer-events: none; }
 .img { position: absolute; left: 50%; top: 50%; width: 1280px; height: 720px; object-fit: cover; }
-.char { position: absolute; left: 0; bottom: 0; width: 0; height: 720px; transition: filter .25s; }
+.char { position: absolute; left: 0; bottom: 0; width: 0; height: 720px; transition: filter .25s;
+  transform-origin: 0 100%; }  /* 41 zooms around the feet: matched the original within 2 px (リュー 1.5×, 45_03) */
 .char .pt { position: absolute; bottom: 0; left: 0; transform: translateX(-50%); }
 .char .body { display: block; }
 .char .face { position: absolute; }
