@@ -752,7 +752,13 @@ def main():
     # gacha-reveal name plates (needs Pillow + a CJK font); skip quietly if unavailable
     try:
         import gachanames
-        gachanames.main_from_cards(cards)
+        # only cards that have a gacha reveal but no official plate (the global data has one for every card,
+        # so nothing is drawn there; drawing all 784 took most of this step)
+        need = [str(c["id"]) for c in cards if (c.get("gacha") or {}).get("art") and not c["gacha"].get("plate")]
+        if need:
+            gachanames.main_from_cards(cards, only=need)
+        else:
+            print("name plates: every card with a gacha reveal has an official one")
     except Exception as e:
         print("name plates skipped:", e)
 

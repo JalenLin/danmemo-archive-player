@@ -25,6 +25,15 @@ def one(args):
         return f"{src}: {e!r}"
 
 
+# master tables the player build reads (build_web.py, fill_gaps.py, cardstat.py); --player decrypts only these.
+# The others (enemies, quests, shop …) aren't needed, and a few are slow: enemy.enc alone takes ~100 s.
+PLAYER_TABLES = {"adventure", "adventureEncounter", "adventureEpisode", "adventureStage", "alarmVoice", "battleEffect",
+                 "bgm", "character", "characterCostume", "characterPresentCharacterInfo", "characterPresentInfo",
+                 "heroSublimateLevelStep", "movieUsm", "novel", "novelPortrait", "pc", "pcAbility", "pcAbilityPanel",
+                 "pcAffiliation", "pcGuest", "pcGuestLevelStep", "pcJob", "pcLevelStep", "pcSkill", "scenarioLwf", "se",
+                 "singleImage", "startNovel", "voice"}
+
+
 def collect(dirs, out):
     """First directory wins for a given file name."""
     os.makedirs(out, exist_ok=True)
@@ -41,17 +50,28 @@ def main(argv=None):
     lang = argv[argv.index("--lang") + 1] if "--lang" in argv else None
     src = cfg["translations"][lang] if lang else cfg
     dec = cfg["dec"] + (f"_{lang}" if lang else "")
-    tasks = collect(src["novel_dirs"], f"{dec}/novel") + collect(src["master_dirs"], f"{dec}/master")
-    workers = os.cpu_count() or 1
+    masters = collect(src["master_dirs"], f"{dec}/master")
+    if "--player" in argv:
+        masters = [t for t in masters if os.path.basename(t[0])[:-4] in PLAYER_TABLES]
+    tasks = collect(src["novel_dirs"], f"{dec}/novel") + masters
+    # biggest first, one at a time: a few huge master tables (tens of thousands of strings each) left for the
+    # end used to keep two or three cores busy for minutes while the rest sat idle
+    tasks.sort(key=lambda t: -os.path.getsize(t[0]))
+    workers = min(os.cpu_count() or 1, 61)  # 61: ProcessPoolExecutor's limit on Windows
     print(f"decrypting {len(tasks)} files with {workers} processes", flush=True)
-    errs, done = [], 0
+    import time
+    errs, done, last = [], 0, time.time()
     with ProcessPoolExecutor(workers) as ex:
-        for e in ex.map(one, tasks, chunksize=16):
+        futs = [ex.submit(one, t) for t in tasks]
+        from concurrent.futures import as_completed
+        for f in as_completed(futs):
             done += 1
+            e = f.result()
             if e:
                 errs.append(e)
-            if done % 500 == 0 or done == len(tasks):
+            if time.time() - last > 3 or done == len(tasks):
                 print(f"  {done}/{len(tasks)}", flush=True)
+                last = time.time()
     print(len(tasks), "files ->", dec, ",", len(errs), "errors")
     for e in errs[:20]:
         print(e)

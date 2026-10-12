@@ -149,8 +149,11 @@ def decrypted():
         cfg = json.load(open(CONFIG, encoding="utf-8"))
     except (OSError, ValueError):
         return False
+    import decrypt_all
     for kind, dirs in (("novel", cfg["novel_dirs"]), ("master", cfg["master_dirs"])):
         want = {os.path.basename(f)[:-4] for d in dirs for f in glob.glob(os.path.join(d, "*.enc"))}
+        if kind == "master":
+            want &= decrypt_all.PLAYER_TABLES
         have = {os.path.basename(f)[:-5] for f in glob.glob(os.path.join(cfg["dec"], kind, "*.json"))}
         if not want or not want <= have:
             return False
@@ -179,7 +182,7 @@ def run_step(name):
         return keys.main()
     if name == "decrypt":
         import decrypt_all
-        return decrypt_all.main(["decrypt_all.py"])
+        return decrypt_all.main(["decrypt_all.py", "--player"])
     import runpy
     mod = {"fill": "fill_gaps", "build": "build_web"}[name]
     sys.argv = [mod + ".py"]
