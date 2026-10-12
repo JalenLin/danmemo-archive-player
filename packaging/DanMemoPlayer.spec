@@ -24,5 +24,7 @@ hidden = TOOL_MODULES + ["ssl", "math", "csv", "statistics", "email", "http.clie
 a = Analysis([os.path.join(ROOT, "tools", "launcher.py")], pathex=[os.path.join(ROOT, "tools")], datas=datas,
              hiddenimports=hidden, excludes=["tkinter", "matplotlib", "IPython", "pytest"])
 pyz = PYZ(a.pure)
-exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="DanMemoPlayer", console=True, upx=False)
+# UTF-8 mode: open() defaults to UTF-8 instead of the Windows code page (cp950 / cp932 can't read the game's text)
+exe = EXE(pyz, a.scripts, [("X utf8_mode=1", None, "OPTION")], exclude_binaries=True, name="DanMemoPlayer",
+          console=True, upx=False)
 coll = COLLECT(exe, a.binaries, a.datas, name="DanMemoPlayer", upx=False)

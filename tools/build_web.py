@@ -132,7 +132,7 @@ def s32(x):
 
 
 def table(name):
-    return json.load(open(f"{DEC}/master/{name}.json"))["0"]
+    return json.load(open(f"{DEC}/master/{name}.json", encoding="utf-8"))["0"]
 
 
 def find(rel):
@@ -151,7 +151,7 @@ def native_md5s():
     pats = CFG["manifests"] + [os.path.join(CFG["legacy_manifests"], "*", "*.manifest*")]
     for f in [f for p in pats for f in glob.glob(p) if os.path.isfile(f)]:
         try:
-            d = json.load(open(f))
+            d = json.load(open(f, encoding="utf-8"))
         except (OSError, ValueError):
             continue
         out.update(v["md5"] for v in (d.get("assets") or {}).values())
@@ -193,7 +193,7 @@ def portrait_info(dirname):
                     else:
                         faces.append(part)
                 elif f.endswith("cutout.plist"):
-                    m = re.search(r"cutout_coordinate</key>\s*<string>\{(-?\d+),(-?\d+)\}", open(os.path.join(d, f)).read())
+                    m = re.search(r"cutout_coordinate</key>\s*<string>\{(-?\d+),(-?\d+)\}", open(os.path.join(d, f), encoding="utf-8", errors="replace").read())
                     if m:
                         cut = [int(m.group(1)), int(m.group(2))]
             faces.sort()
@@ -301,11 +301,11 @@ def build_movies(refs, movie, titles):
         src = name and find(f"files/movie/{name}.mp4")
         if not src:
             continue
-        disk = os.path.join(WEB, src)
+        disk = next((d + src[len(w):] for w, d in ROOTS if src.startswith(w)), os.path.join(WEB, src))  # no symlink needed
         poster, dur = None, None
         try:
             dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", disk],
-                                       capture_output=True, text=True, timeout=60).stdout.strip() or 0) or None
+                                       capture_output=True, text=True, encoding="utf-8", timeout=60).stdout.strip() or 0) or None
             out = f"{WEB}/data/movies/{name}.jpg"
             if not os.path.exists(out):
                 # try a few frames and keep the busiest one (cutscenes often flash to white/black)
@@ -401,7 +401,7 @@ def main():
     GAP_KIND = {"single_image": "img", "movie_usm": "movie", "novel_portrait": "chara", "scenario_lwf": "fx",
                 "battle_effect": "fx", "voice": "voice", "bgm": "sound", "se": "sound"}
     for f in sorted(glob.glob(f"{DEC}/novel/*.json")):
-        cmds = json.load(open(f))["0"]
+        cmds = json.load(open(f, encoding="utf-8"))["0"]
         nid = cmds[0]["1"]
         row = novel.get(nid) or novel.get(s32(nid))
         key, title = row["1"], row.get("2", "")

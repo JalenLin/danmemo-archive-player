@@ -40,7 +40,7 @@ while True:
     print("got", fn, len(body))
     n += 1
 
-for k, v in json.load(open(os.path.join(OUT, "project.manifest")))["assets"].items():
+for k, v in json.load(open(os.path.join(OUT, "project.manifest"), encoding="utf-8"))["assets"].items():
     if k.startswith("manifests/"):
         open(os.path.join(OUT, k), "wb").write(get(v["path"]))
         print("got", k)

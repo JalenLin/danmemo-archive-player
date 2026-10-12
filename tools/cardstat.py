@@ -3,7 +3,7 @@ import collections, json, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config
 DEC = config.load()["dec"]
-L = lambda t: json.load(open(f"{DEC}/master/{t}.json"))["0"]
+L = lambda t: json.load(open(f"{DEC}/master/{t}.json", encoding="utf-8"))["0"]
 STATS = [(2, "力"), (16, "耐久"), (32, "器用"), (8, "敏捷"), (4, "魔力")]
 _ab = {r["0"]: r for r in L("pcAbility")}
 _job = {r["0"]: r for r in L("pcJob")}

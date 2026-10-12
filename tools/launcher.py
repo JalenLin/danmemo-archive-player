@@ -143,6 +143,20 @@ def copy_player():
             shutil.copy2(s, d)
 
 
+def decrypted():
+    """every .enc of the configured backup already has its decrypted .json (a rebuild after a failed step)"""
+    try:
+        cfg = json.load(open(CONFIG, encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    for kind, dirs in (("novel", cfg["novel_dirs"]), ("master", cfg["master_dirs"])):
+        want = {os.path.basename(f)[:-4] for d in dirs for f in glob.glob(os.path.join(d, "*.enc"))}
+        have = {os.path.basename(f)[:-5] for f in glob.glob(os.path.join(cfg["dec"], kind, "*.json"))}
+        if not want or not want <= have:
+            return False
+    return True
+
+
 def built():
     return os.path.exists(os.path.join(WORK, "web", "data", "index.json"))
 
@@ -204,10 +218,13 @@ class Job:
                     continue
                 if name == "keys" and os.path.exists(KEYS):
                     continue
+                if name == "decrypt" and decrypted():
+                    self.say("== Decrypted data already complete, skipped")
+                    continue
                 self.step = title
                 self.say(f"== {title}")
                 cmd = ([sys.executable] if FROZEN else [sys.executable, os.path.abspath(__file__)]) + ["--step", name]
-                env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}
+                env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
                 ff = os.path.join(APP, "ffmpeg")
                 if os.path.isdir(ff):
                     env["PATH"] = ff + os.pathsep + env.get("PATH", "")

@@ -12,7 +12,7 @@ import zlib
 from Crypto.Cipher import AES
 
 _KEYS = json.load(open(os.environ.get("DANMEMO_KEYS")
-                       or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "keys.json")))
+                       or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "keys.json"), encoding="utf-8"))
 AES_KEY = _KEYS["aes_key"].encode("latin-1")
 AES_IV = _KEYS["aes_iv"].encode("latin-1")
 XXTEA_KEY = _KEYS["xxtea_key"].encode("latin-1")

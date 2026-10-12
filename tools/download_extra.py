@@ -6,7 +6,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import download
 
-items = json.load(open(sys.argv[1]))
+items = json.load(open(sys.argv[1], encoding="utf-8"))
 workers = int(sys.argv[2]) if len(sys.argv) > 2 else 12
 with ThreadPoolExecutor(workers) as ex:
     res = list(ex.map(lambda kv: download.fetch(*kv), items.items()))

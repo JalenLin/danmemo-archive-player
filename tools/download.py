@@ -27,14 +27,14 @@ def jobs():
     seen = {}
     names = sorted((f for f in os.listdir(MAN) if f.startswith("project.manifest")), key=lambda f: (len(f), f))
     for name in names:
-        for k, v in json.load(open(f"{MAN}/{name}"))["assets"].items():
+        for k, v in json.load(open(f"{MAN}/{name}", encoding="utf-8"))["assets"].items():
             if k.startswith("manifests/"):
                 continue
             seen[k] = v
-    for v in json.load(open(f"{MAN}/manifests/single_image.manifest"))["singleImages"].values():
+    for v in json.load(open(f"{MAN}/manifests/single_image.manifest", encoding="utf-8"))["singleImages"].values():
         k = v["path"].split("/", 1)[1].rsplit("/", 1)[0]  # files/ui/single_image/<id>.jpg
         seen.setdefault(k, v)
-    for v in json.load(open(f"{MAN}/manifests/voice_episode.manifest"))["episodes"].values():
+    for v in json.load(open(f"{MAN}/manifests/voice_episode.manifest", encoding="utf-8"))["episodes"].values():
         k = v["path"].split("/", 1)[1].rsplit("/", 1)[0]  # files/sound/voice_episode_zip/<id>.zip
         seen.setdefault(k, v)
     return seen
@@ -94,7 +94,7 @@ def main():
                     el = time.time() - t0
                     print(f"{done}/{len(js)} files, {nbytes / 1e9:.2f}/{total / 1e9:.2f} GB, "
                           f"{el / 60:.1f} min, fails={len(fails)}", flush=True)
-    with open(f"{MAN}/download_failures.txt", "w") as f:
+    with open(f"{MAN}/download_failures.txt", "w", encoding="utf-8") as f:
         for k, st in fails:
             f.write(f"{k}\t{st}\n")
     print("done; failures:", len(fails), flush=True)

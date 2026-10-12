@@ -49,7 +49,7 @@ def manifest_entries(path):
     """{logical path: {md5, path, size}} from a project/phase manifest, or the single_image /
     voice_episode manifests (keyed by id, logical path = the CDN path without contents/ and md5)."""
     try:
-        d = json.load(open(path))
+        d = json.load(open(path, encoding="utf-8"))
     except (OSError, ValueError):
         return {}
     if "assets" in d:
@@ -118,7 +118,7 @@ def collect():
     kre = re.compile(r"^(single_image|bgm|se|voice|scenario_lwf|battle_effect|movie_usm)\.")
     refs = set()
     for f in glob.glob(f"{CFG['web']}/data/novel/*.json"):
-        d = json.load(open(f))
+        d = json.load(open(f, encoding="utf-8"))
         for c in d.get("cmds", []):
             if isinstance(c, list):
                 for v in c:

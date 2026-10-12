@@ -34,6 +34,7 @@ jobs:
           $bin = Get-ChildItem ffmpeg-dl -Recurse -Filter ffmpeg.exe | Select-Object -First 1
           New-Item -ItemType Directory -Force dist/DanMemoPlayer/_internal/ffmpeg | Out-Null
           Copy-Item $bin.FullName dist/DanMemoPlayer/_internal/ffmpeg/
+          Copy-Item (Join-Path $bin.Directory.FullName "ffprobe.exe") dist/DanMemoPlayer/_internal/ffmpeg/
           Copy-Item (Join-Path $bin.Directory.Parent.FullName "LICENSE") dist/DanMemoPlayer/_internal/ffmpeg/LICENSE.txt
 
       - name: Smoke test (starts, serves the setup page, a build step runs)
