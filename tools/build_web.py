@@ -11,11 +11,11 @@ import collections
 import glob
 import hashlib
 import json
+import struct
 import subprocess
 import os
 import re
 
-from PIL import Image
 
 import sys
 
@@ -179,6 +179,39 @@ def index_dir(rel_dirs, ext):
     return idx
 
 
+def image_size(path):
+    """[width, height] from the file header: PNG, WebP (the global client's ".png" portraits are WebP) or JPEG.
+    No Pillow: Android's Pillow build has no WebP."""
+    with open(path, "rb") as f:
+        h = f.read(64)
+        if h[:8] == b"\x89PNG\r\n\x1a\n":
+            return list(struct.unpack(">II", h[16:24]))
+        if h[:4] == b"RIFF" and h[8:12] == b"WEBP":
+            kind = h[12:16]
+            if kind == b"VP8X":
+                return [1 + int.from_bytes(h[24:27], "little"), 1 + int.from_bytes(h[27:30], "little")]
+            if kind == b"VP8L":
+                b = int.from_bytes(h[21:25], "little")
+                return [(b & 0x3FFF) + 1, ((b >> 14) & 0x3FFF) + 1]
+            if kind == b"VP8 ":
+                w, hh = struct.unpack("<HH", h[26:30])
+                return [w & 0x3FFF, hh & 0x3FFF]
+        if h[:2] == b"\xff\xd8":
+            f.seek(2)
+            while True:
+                m = f.read(4)
+                if len(m) < 4 or m[0] != 0xFF:
+                    break
+                n = struct.unpack(">H", m[2:4])[0]
+                if 0xC0 <= m[1] <= 0xCF and m[1] not in (0xC4, 0xC8, 0xCC):
+                    hh, w = struct.unpack(">HH", f.read(5)[1:5])
+                    return [w, hh]
+                f.seek(n - 2, 1)
+    from PIL import Image  # anything else
+    with Image.open(path) as im:
+        return list(im.size)
+
+
 def portrait_info(dirname):
     for web, disk in ROOTS:
         d = f"{disk}files/character/novel_portrait/{dirname}"
@@ -197,7 +230,7 @@ def portrait_info(dirname):
                     if m:
                         cut = [int(m.group(1)), int(m.group(2))]
             faces.sort()
-            size = lambda part: list(Image.open(f"{d}/{dirname}{'.' + part if part else ''}.png").size)
+            size = lambda part: image_size(f"{d}/{dirname}{'.' + part if part else ''}.png")
             info = {"base": f"{web}files/character/novel_portrait/{dirname}/{dirname}", "faces": faces,
                     "body": body, "cut": cut}
             if faces:

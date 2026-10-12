@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="perm_title">存取手機儲存空間</string>
+    <string name="perm_body">請把國際版 APK 和解壓好的 App 資料備份放在手機儲存空間的 DanMemo 資料夾（%1$s）。要讀取它們，App 需要「允許管理所有檔案」的權限，下一個畫面可以開啟。不會上傳任何資料，所有內容都留在這支手機上。</string>
+    <string name="perm_ok">開啟設定</string>
+    <string name="perm_exit">離開</string>
+    <string name="starting">啟動中…</string>
+</resources>

@@ -11,6 +11,10 @@ Put your own game data in a `data` folder next to the program, then start it:
 A browser page shows what was found and builds everything into a `work` folder (keys, decrypted
 data, the player's data); then the player opens. Nothing is uploaded anywhere: it is a local server.
 `--step NAME` runs one build step in a child process (used internally).
+
+The Android app runs this too (android/): it sets DANMEMO_APP (where tools/ and web/ were unpacked),
+DANMEMO_HOME (for work/), DANMEMO_DATA (the data folder in shared storage) and DANMEMO_INPROCESS=1 (no child
+processes there: each step runs in this process, its output captured for the page).
 """
 import glob
 import json
@@ -27,9 +31,11 @@ import webbrowser
 from http.server import ThreadingHTTPServer
 
 FROZEN = getattr(sys, "frozen", False)
-APP = getattr(sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # bundled tools/ and web/
-BASE = os.path.dirname(sys.executable) if FROZEN else os.getcwd()  # where the user's data/ and our work/ live
-DATA = os.path.join(BASE, "data")
+APP = (os.environ.get("DANMEMO_APP") or
+       getattr(sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))  # bundled tools/ and web/
+BASE = os.environ.get("DANMEMO_HOME") or (os.path.dirname(sys.executable) if FROZEN else os.getcwd())  # work/ (and data/)
+DATA = os.environ.get("DANMEMO_DATA") or os.path.join(BASE, "data")
+INPROCESS = bool(os.environ.get("DANMEMO_INPROCESS"))
 WORK = os.path.join(BASE, "work")
 CONFIG = os.path.join(WORK, "config.json")
 SETTINGS = os.path.join(WORK, "settings.json")  # what the user picked on the setup page
@@ -61,6 +67,7 @@ def find_dump(path):
     if not path or not os.path.isdir(path):
         return None, f"Folder not found: {path}"
     for root, dirs, files in os.walk(path, followlinks=True):
+        dirs[:] = [d for d in dirs if d not in ("files", "master", "voice_root", "single_image_root")]  # backup innards
         if root[len(path):].count(os.sep) > 3:
             dirs[:] = []
             continue
@@ -68,7 +75,7 @@ def find_dump(path):
             return root, ""
         if any(f.lower().endswith(".rar") for f in files):
             return None, ("This folder has RAR parts that aren't extracted yet: open contents.part1.rar with "
-                          "7-Zip or WinRAR, extract it, then give the extracted folder.")
+                          "7-Zip or WinRAR (ZArchiver on Android), extract it, then give the extracted folder.")
     return None, "No app-data backup in this folder (expected contents/1/master/divide_novel_command_enc)."
 
 
@@ -99,8 +106,9 @@ def detect():
         for f in files:
             if f.lower().endswith((".apk", ".xapk")) or f == "libapp.so":
                 cands.append(os.path.join(root, f))
-        if os.path.isdir(os.path.join(root, "1", "master", "divide_novel_command_enc")) and not found["dump"]:
-            found["dump"] = root
+        if os.path.isdir(os.path.join(root, "1", "master", "divide_novel_command_enc")):
+            found["dump"] = found["dump"] or root
+            dirs[:] = []  # don't walk the backup's ~100,000 files (slow on Android's shared storage)
     # prefer the global APK, then any other APK / xapk / libapp.so
     cands.sort(key=lambda p: (0 if "eu.danmemo" in os.path.basename(p) else 1, p))
     found["keysrc"] = found["keysrc"] or (cands[0] if cands else None)
@@ -108,8 +116,9 @@ def detect():
         found["notes"].append("Choose the APK: the global com.eu.danmemo 2023-12-22 APK, or the JP memorial app's .xapk.")
     if not found["dump"] and not st.get("dump"):
         found["notes"].append("Give the folder of the extracted app-data backup (the one with contents/1 … contents/8).")
-    if glob.glob(os.path.join(DATA, "**", "*.rar"), recursive=True) and not found["dump"]:
-        found["notes"].append("RAR parts found but not extracted: open contents.part1.rar with 7-Zip / WinRAR and extract into data/.")
+    if not found["dump"] and glob.glob(os.path.join(DATA, "**", "*.rar"), recursive=True):
+        found["notes"].append("RAR parts found but not extracted: open contents.part1.rar with 7-Zip / WinRAR "
+                              "(ZArchiver on Android) and extract it into the data folder.")
     return found
 
 
@@ -200,7 +209,8 @@ class Job:
         with self.lock:
             self.log.append(line.rstrip("\n"))
             del self.log[:-400]
-        print(line.rstrip("\n"), flush=True)
+        if sys.__stdout__:  # the console (or Android's logcat); steps run in-process print into the log instead
+            print(line.rstrip("\n"), file=sys.__stdout__, flush=True)
 
     def start(self, download):
         if self.state == "running":
@@ -228,6 +238,13 @@ class Job:
                     continue
                 self.step = title
                 self.say(f"== {title}")
+                if INPROCESS:
+                    code = self._inprocess(name)
+                    if code:
+                        self.say(f"! step failed: {title} (exit {code})")
+                        self.state = "error"
+                        return
+                    continue
                 cmd = ([sys.executable] if FROZEN else [sys.executable, os.path.abspath(__file__)]) + ["--step", name]
                 env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
                 ff = os.path.join(APP, "ffmpeg")
@@ -248,6 +265,42 @@ class Job:
         except Exception as e:  # keep the page informative instead of dying silently
             self.say(f"! {type(e).__name__}: {e}")
             self.state = "error"
+
+
+    def _inprocess(self, name):
+        """Run a step here (Android), its prints going to the log. Returns the exit code."""
+        import contextlib
+        import traceback
+
+        job = self
+
+        class Lines:
+            def __init__(self):
+                self.buf = ""
+
+            def write(self, s):
+                self.buf += s
+                *done, self.buf = self.buf.split("\n")
+                for line in done:
+                    job.say(line)
+                return len(s)
+
+            def flush(self):
+                pass
+
+        out = Lines()
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+                code = run_step(name)
+        except SystemExit as e:
+            code = e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
+        except Exception:
+            for line in traceback.format_exc().splitlines():
+                self.say(line)
+            code = 1
+        if out.buf:
+            self.say(out.buf)
+        return code or 0
 
 
 JOB = Job()

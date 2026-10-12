@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DanMemo Player</string>
+    <string name="perm_title">Storage access</string>
+    <string name="perm_body">Put the global APK and the extracted app-data backup in the DanMemo folder of your phone\'s storage (%1$s). To read them, the app needs \"Allow access to manage all files\" — the next screen turns it on. Nothing is uploaded: everything stays on this phone.</string>
+    <string name="perm_ok">Open settings</string>
+    <string name="perm_exit">Exit</string>
+    <string name="starting">Starting…</string>
+</resources>

@@ -30,6 +30,16 @@ Game images shown are copyright of their respective owners. No game data comes w
 
 Download `DanMemoPlayer-windows.zip` from [Releases](https://github.com/JalenLin/danmemo-archive-player/releases), unzip it and run `DanMemoPlayer.exe`. On the page that opens, choose the global APK (or the JP memorial app's `.xapk`), paste the folder of your extracted app-data backup and click Build. See `README.txt` in the zip. The rest of this file describes building from source.
 
+## Android app (no computer needed)
+
+Download `DanMemoPlayer-android.apk` from [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) and install it. It needs Android 7.0 or later on a 64-bit phone.
+1. Make a `DanMemo` folder in the phone's storage and put the global APK and the extracted app-data backup (the `contents` folder) in it. ZArchiver can extract the RAR parts. While extracting, the RAR parts and the extracted files coexist: have about 30 GB free (delete the RAR parts afterwards).
+2. Open the app and allow "manage all files" when asked (to read the `DanMemo` folder).
+3. The setup page finds the APK and the backup by itself; tap Build. Decryption takes about 5–10 minutes; keep the app in the foreground meanwhile.
+4. Then the player opens full screen. Held sideways, its toolbar hides itself; tap the top edge to bring it back.
+
+There is no ffmpeg on the phone, so the few `.usm` cutscenes only the CDN has aren't converted; the backup's own movies play normally.
+
 ## Two ways to set it up
 
 | | Setup A: Japanese memorial app | Setup B: global app-data backup |
@@ -228,6 +238,7 @@ tools/usm.py             CRI USM → MP4
 tools/gachanames.py      gacha name plates (called by build_web.py)
 tools/serve.py           local server with HTTP Range support
 tools/launcher.py        the Windows app's launcher: setup page in the browser, writes the config, runs the build, serves the player (packaging/ holds the build spec)
+android/                 the Android app: Chaquopy runs launcher.py in-process, a full-screen WebView shows the setup page and the player
 web/js/i18n.js           interface strings (Japanese keys → English / Chinese) and date formats
 tools/smoke.py           player test: plays stories in skip mode and reports hangs, command errors and failed asset loads (`smoke.py all --workers 10` for every story; Playwright; set DANMEMO_URL)
 tools/vidcompare.py      compare with a recording of the original game: screenshot every line, align with the video, list the lines that differ most (ffmpeg, Playwright)

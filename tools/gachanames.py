@@ -19,7 +19,8 @@ FONT = next((f for f in [os.environ.get("DANMEMO_FONT", ""),
                          os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "YuGothB.ttc"),
                          os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "meiryob.ttc"),
                          os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "msgothic.ttc"),
-                         "/System/Library/Fonts/ヒラギノ角ゴシック W8.ttc"] if f and os.path.exists(f)), None)
+                         "/System/Library/Fonts/ヒラギノ角ゴシック W8.ttc",
+                         "/system/fonts/NotoSansCJK-Regular.ttc"] if f and os.path.exists(f)), None)
 W, H = 960, 240
 
 

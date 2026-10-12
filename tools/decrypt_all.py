@@ -8,7 +8,7 @@ import glob
 import json
 import os
 import sys
-from concurrent.futures import ProcessPoolExecutor
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config
@@ -44,6 +44,68 @@ def collect(dirs, out):
     return [(f, os.path.join(out, name[:-4] + ".json")) for name, f in sorted(seen.items())]
 
 
+def run(tasks):
+    """Decrypt the tasks in parallel, yielding each one's error (or None) as it finishes. A process pool where
+    Python has one; on Android (no working multiprocessing: no sem_open) forked workers that each take every
+    n-th task and report through a pipe; one at a time if even that fails. DANMEMO_POOL=fork / serial forces one."""
+    mode = os.environ.get("DANMEMO_POOL") or ("fork" if hasattr(sys, "getandroidapilevel") else "pool")
+    if mode == "pool":
+        from concurrent.futures import ProcessPoolExecutor, as_completed  # imports _multiprocessing: not on Android
+        workers = min(os.cpu_count() or 1, 61)  # 61: ProcessPoolExecutor's limit on Windows
+        print(f"decrypting {len(tasks)} files with {workers} processes", flush=True)
+        with ProcessPoolExecutor(workers) as ex:
+            for f in as_completed([ex.submit(one, t) for t in tasks]):
+                yield f.result()
+        return
+    if mode == "fork" and hasattr(os, "fork"):
+        # phones: a handful of workers (each holds a big table in memory at the start: biggest files go first)
+        workers = max(1, min(os.cpu_count() or 1, int(os.environ.get("DANMEMO_WORKERS") or 4)))
+        try:
+            yield from fork_run(tasks, workers)
+            return
+        except OSError as e:
+            print(f"parallel decryption unavailable ({e}); one file at a time", flush=True)
+    print(f"decrypting {len(tasks)} files one at a time", flush=True)
+    for t in tasks:
+        yield one(t)
+
+
+def fork_run(tasks, workers):
+    print(f"decrypting {len(tasks)} files with {workers} worker processes", flush=True)
+    r, w = os.pipe()
+    pids = []
+    try:
+        for i in range(workers):
+            pid = os.fork()
+            if pid == 0:  # child: never return into the caller (or, on Android, into the app)
+                code = 0
+                try:
+                    os.close(r)
+                    for t in tasks[i::workers]:
+                        e = one(t)
+                        # one line per finished file, under PIPE_BUF so lines from different workers don't mix
+                        os.write(w, ((e or "").replace("\n", " ")[:1000] + "\n").encode("utf-8", "replace"))
+                except BaseException:
+                    code = 1
+                finally:
+                    os._exit(code)
+            pids.append(pid)
+    finally:
+        os.close(w)
+    with os.fdopen(r, "rb") as f:
+        got = 0
+        for line in f:
+            got += 1
+            yield line.decode("utf-8", "replace").rstrip("\n") or None
+    for pid in pids:
+        os.waitpid(pid, 0)
+    if got < len(tasks):  # a worker died (out of memory?): do what it left, here
+        print(f"{len(tasks) - got} files left by a stopped worker; decrypting them here", flush=True)
+        for t in tasks:
+            if not os.path.exists(t[1]):
+                yield one(t)
+
+
 def main(argv=None):
     argv = sys.argv if argv is None else argv
     cfg = config.load()
@@ -57,21 +119,14 @@ def main(argv=None):
     # biggest first, one at a time: a few huge master tables (tens of thousands of strings each) left for the
     # end used to keep two or three cores busy for minutes while the rest sat idle
     tasks.sort(key=lambda t: -os.path.getsize(t[0]))
-    workers = min(os.cpu_count() or 1, 61)  # 61: ProcessPoolExecutor's limit on Windows
-    print(f"decrypting {len(tasks)} files with {workers} processes", flush=True)
-    import time
     errs, done, last = [], 0, time.time()
-    with ProcessPoolExecutor(workers) as ex:
-        futs = [ex.submit(one, t) for t in tasks]
-        from concurrent.futures import as_completed
-        for f in as_completed(futs):
-            done += 1
-            e = f.result()
-            if e:
-                errs.append(e)
-            if time.time() - last > 3 or done == len(tasks):
-                print(f"  {done}/{len(tasks)}", flush=True)
-                last = time.time()
+    for e in run(tasks):
+        done += 1
+        if e:
+            errs.append(e)
+        if time.time() - last > 3 or done == len(tasks):
+            print(f"  {done}/{len(tasks)}", flush=True)
+            last = time.time()
     print(len(tasks), "files ->", dec, ",", len(errs), "errors")
     for e in errs[:20]:
         print(e)

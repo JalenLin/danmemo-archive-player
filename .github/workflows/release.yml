@@ -1,0 +1,127 @@
+# Builds the Windows app (DanMemoPlayer-windows.zip) and the Android app (DanMemoPlayer-android.apk) on a version
+# tag, checks that the Windows one starts, and attaches both to a GitHub release. Run it by hand from the Actions
+# tab too: the files are then kept as workflow artifacts (the APK debug-signed unless a signing key is set).
+name: Apps
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install pyinstaller pycryptodome pyelftools numpy pillow
+
+      - name: Build
+        run: pyinstaller --noconfirm packaging/DanMemoPlayer.spec
+
+      - name: Add ffmpeg (converts the game's cutscenes; GPL, shipped as a separate program)
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-dl
+          $bin = Get-ChildItem ffmpeg-dl -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+          New-Item -ItemType Directory -Force dist/DanMemoPlayer/_internal/ffmpeg | Out-Null
+          Copy-Item $bin.FullName dist/DanMemoPlayer/_internal/ffmpeg/
+          Copy-Item (Join-Path $bin.Directory.FullName "ffprobe.exe") dist/DanMemoPlayer/_internal/ffmpeg/
+          Copy-Item (Join-Path $bin.Directory.Parent.FullName "LICENSE") dist/DanMemoPlayer/_internal/ffmpeg/LICENSE.txt
+
+      - name: Smoke test (starts, serves the setup page, a build step runs)
+        shell: pwsh
+        run: |
+          $env:DANMEMO_NO_BROWSER = "1"; $env:DANMEMO_PORT = "8099"
+          $p = Start-Process dist/DanMemoPlayer/DanMemoPlayer.exe -PassThru -WorkingDirectory dist/DanMemoPlayer
+          Start-Sleep -Seconds 8
+          $s = Invoke-RestMethod http://127.0.0.1:8099/setup/status
+          if ($s.state -ne "idle") { throw "unexpected state $($s.state)" }
+          (Invoke-WebRequest http://127.0.0.1:8099/setup -UseBasicParsing).StatusCode
+          Stop-Process -Id $p.Id
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/DanMemoPlayer/data | Out-Null
+          Copy-Item packaging/README-windows.txt dist/DanMemoPlayer/README.txt
+          Compress-Archive dist/DanMemoPlayer DanMemoPlayer-windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DanMemoPlayer-windows
+          path: DanMemoPlayer-windows.zip
+
+  android:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Chaquopy installs the app's pip packages with the same Python version on the build machine
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Signing key
+        if: env.HAS_KEY == 'true'
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: Build
+        working-directory: android
+        env:
+          DANMEMO_KEYSTORE: ${{ env.HAS_KEY == 'true' && format('{0}/release.jks', runner.temp) || '' }}
+          DANMEMO_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          DANMEMO_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          DANMEMO_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || V=0.0.1
+          IFS=. read -r MA MI PA <<< "$V"
+          CODE=$((MA * 10000 + MI * 100 + PA))
+          if [ "$HAS_KEY" = true ]; then
+            ./gradlew assembleRelease -PversionName="$V" -PversionCode="$CODE" --console=plain
+            cp app/build/outputs/apk/release/app-release.apk ../DanMemoPlayer-android.apk
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "::error::a release needs the signing key (ANDROID_KEYSTORE_BASE64 etc. secrets)"; exit 1
+          else
+            ./gradlew assembleDebug -PversionName="$V" -PversionCode="$CODE" --console=plain
+            cp app/build/outputs/apk/debug/app-debug.apk ../DanMemoPlayer-android.apk
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DanMemoPlayer-android
+          path: DanMemoPlayer-android.apk
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/DanMemoPlayer-windows.zip dist/DanMemoPlayer-android.apk --title "$GITHUB_REF_NAME" --notes-file packaging/release-notes.md --verify-tag

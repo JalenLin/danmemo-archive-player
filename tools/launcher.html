@@ -21,6 +21,16 @@
   label { cursor: pointer; }
   pre { background: #070b16; border: 1px solid var(--line); border-radius: 8px; padding: 10px; height: 320px; overflow: auto; font-size: 12.5px; white-space: pre-wrap; margin: 0; }
   ul { margin: 6px 0; padding-left: 20px; }
+  #dumppath { min-width: 280px; }
+  @media (max-width: 640px) {  /* phones (the Android app) */
+    main { padding: 16px 12px 32px; }
+    .row { flex-direction: column; gap: 2px; }
+    .row b { min-width: 0; }
+    .row > span { width: 100%; }
+    #dumppath { min-width: 0; width: 100%; box-sizing: border-box; }
+    #dumpmsg { margin-left: 0 !important; }
+    pre { height: 240px; }
+  }
 </style>
 </head>
 <body>
@@ -41,7 +51,7 @@
       <span><input type="file" id="apkfile" accept=".apk,.xapk"> <span id="apkprog" class="muted"></span></span></div>
     <div class="row"><b data-t="pickdump"></b>
       <span style="flex:1; display:flex; gap:8px; flex-wrap:wrap">
-        <input type="text" id="dumppath" style="flex:1; min-width:280px; padding:6px 8px; background:#0e1428; color:var(--text); border:1px solid var(--line); border-radius:6px">
+        <input type="text" id="dumppath" style="flex:1; padding:6px 8px; background:#0e1428; color:var(--text); border:1px solid var(--line); border-radius:6px">
         <button id="dumpok" style="padding:6px 14px" data-t="check"></button>
       </span></div>
     <div id="dumpmsg" class="muted" style="margin-left:9.6em"></div>
@@ -62,30 +72,30 @@
 </main>
 <script>
 const T = {
-  en: { intro: 'Builds the story player from your own game data. Everything stays on this computer.',
+  en: { intro: 'Builds the story player from your own game data. Everything stays on this device.',
         datafolder: 'Data folder', apk: 'Keys from', dump: 'App-data backup', none: 'not found',
         download: 'Download what the backup lacks from the game\'s CDN (about 1.6 GB; event voices and a few images)',
         build: 'Build', rebuild: 'Rebuild', open: 'Open the player ▶', running: 'Working…', done: 'Ready.', error: 'Stopped — see the log.',
         ffok: 'found (cutscenes will be converted)', ffno: 'not found (cutscenes are skipped)',
         note: 'The build takes a few minutes, plus the download if chosen. Keep this page and the program window open until it says Ready.',
         pickapk: 'APK', pickdump: 'Backup folder', check: 'Use this folder', uploading: 'copying…', uploaded: 'saved',
-        howdump: 'Paste the path of the extracted backup (e.g. D:\\danmemo\\contents, or the folder that holds it). Nothing is copied.' },
-  zh: { intro: '用你自己的遊戲資料建置劇情播放器。所有資料都留在這台電腦上。',
+        howdump: 'Paste the path of the extracted backup (e.g. D:\\danmemo\\contents, or the folder that holds it). Nothing is copied. On Android, putting it in the data folder above is enough.' },
+  zh: { intro: '用你自己的遊戲資料建置劇情播放器。所有資料都留在這台裝置上。',
         datafolder: '資料資料夾', apk: '金鑰來源', dump: 'App 資料備份', none: '找不到',
         download: '從遊戲 CDN 補下載備份缺少的素材（約 1.6 GB，主要是活動語音和少數圖片）',
         build: '開始建置', rebuild: '重新建置', open: '開啟播放器 ▶', running: '處理中…', done: '完成。', error: '已停止，請看下方記錄。',
         ffok: '有（會轉換過場影片）', ffno: '沒有（略過過場影片）',
         note: '建置約幾分鐘，勾選補下載的話另外加上下載時間。顯示「完成」之前，請保持這個頁面和程式視窗開著。',
         pickapk: 'APK', pickdump: '備份資料夾', check: '使用這個資料夾', uploading: '複製中…', uploaded: '已存好',
-        howdump: '貼上解壓後的備份所在路徑（例如 D:\\danmemo\\contents，或它的上一層資料夾）。不會複製檔案。' },
-  ja: { intro: '自分のゲームデータからシナリオプレイヤーを作成します。データはこのパソコンから外に出ません。',
+        howdump: '貼上解壓後的備份所在路徑（例如 D:\\danmemo\\contents，或它的上一層資料夾）。不會複製檔案。Android 上只要放在上面的資料資料夾裡即可。' },
+  ja: { intro: '自分のゲームデータからシナリオプレイヤーを作成します。データはこの端末から外に出ません。',
         datafolder: 'データフォルダ', apk: '鍵の取得元', dump: 'アプリデータのバックアップ', none: '見つかりません',
         download: 'バックアップに足りない素材をゲームの CDN からダウンロード（約 1.6 GB、主にイベントボイス）',
         build: '作成', rebuild: '作り直す', open: 'プレイヤーを開く ▶', running: '処理中…', done: '完了。', error: '停止しました。ログを確認してください。',
         ffok: 'あり（ムービーを変換）', ffno: 'なし（ムービーは省略）',
         note: '作成は数分ほど（ダウンロードする場合はその時間が加わります）。「完了」と表示されるまで、このページとプログラムの画面を閉じないでください。',
         pickapk: 'APK', pickdump: 'バックアップのフォルダ', check: 'このフォルダを使う', uploading: 'コピー中…', uploaded: '保存しました',
-        howdump: '展開したバックアップのパスを貼り付けてください（例：D:\\danmemo\\contents、またはその上のフォルダ）。ファイルはコピーしません。' },
+        howdump: '展開したバックアップのパスを貼り付けてください（例：D:\\danmemo\\contents、またはその上のフォルダ）。ファイルはコピーしません。Android では上のデータフォルダに置くだけで大丈夫です。' },
 };
 const nl = (navigator.language || 'en').toLowerCase();
 const L = T[nl.startsWith('zh') ? 'zh' : nl.startsWith('ja') ? 'ja' : 'en'];

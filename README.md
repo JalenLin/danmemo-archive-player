@@ -32,6 +32,16 @@
 
 到 [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) 下載 `DanMemoPlayer-windows.zip`，解壓後執行 `DanMemoPlayer.exe`，在開啟的頁面選擇國際版 APK（或日版紀念版的 `.xapk`）並貼上解壓好的 App 資料備份資料夾，按「開始建置」即可。細節見 zip 裡的 `README.txt`。以下是用原始碼建置的步驟。
 
+## Android 版（不用電腦）
+
+到 [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) 下載 `DanMemoPlayer-android.apk` 安裝。需要 Android 7.0 以上的 64 位元手機。
+1. 在手機儲存空間建立 `DanMemo` 資料夾，放入國際版 APK 和解壓好的 App 資料備份（`contents` 資料夾）。RAR 分割檔可以用 ZArchiver 解壓。解壓時 RAR 和解壓結果會同時存在，請準備約 30 GB 空間，解壓完可以刪掉 RAR。
+2. 開啟 App，依提示允許「管理所有檔案」（用來讀取 `DanMemo` 資料夾）。
+3. 設定頁會自動找到 APK 和備份，按「開始建置」。解密約 5〜10 分鐘，期間請讓 App 留在前景。
+4. 完成後就是全螢幕的播放器；手機橫拿時工具列會自動隱藏，點畫面最上緣叫出來。
+
+手機上沒有 ffmpeg，少數只能從 CDN 下載的 `.usm` 過場影片不會轉檔；備份裡原有的影片可以正常播放。
+
 ## 需要準備
 
 - Python 3.10 以上；`ffmpeg`（只有轉換過場影片時需要）
@@ -161,6 +171,7 @@ tools/usm.py            CRI USM → MP4
 tools/gachanames.py     抽卡演出的名牌圖（build_web.py 會呼叫）
 tools/serve.py          本機伺服器（支援 Range）
 tools/launcher.py       Windows 版的啟動程式：瀏覽器設定頁、自動產生設定、依序建置、提供播放器（packaging/ 是打包設定）
+android/                Android 版：Chaquopy 在 App 內執行 launcher.py，全螢幕 WebView 顯示設定頁和播放器
 web/js/i18n.js          介面文字（日文為鍵 → 英文／中文）與日期格式
 tools/smoke.py          播放器自動測試：以快轉模式播放劇情，回報卡住、指令錯誤、素材載入失敗（`smoke.py all --workers 10` 跑全部；Playwright；DANMEMO_URL 指定網址）
 tools/vidcompare.py     對照原作錄影：逐句截圖播放器、和影片逐句對齊，列出畫面差異最大的句子（需要 ffmpeg、Playwright）

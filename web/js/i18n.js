@@ -162,6 +162,7 @@ const D = {
   '← 目録': ['← Index', '← 目錄'],
   'ボイス': ['Voice', '語音'],
   '非表示': ['Hide', '隱藏'],
+  '全画面': ['Full screen', '全螢幕'],
   'テキストボックスを隠す（スクリーンショット用・H／右クリック）': ['Hide the text box for screenshots (H / right-click)', '隱藏對話框以便截圖（H／右鍵）'],
   '設定': ['Settings', '設定'],
   '色': ['Colour', '顏色'],

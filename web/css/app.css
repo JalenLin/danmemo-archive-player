@@ -72,6 +72,15 @@ body.playing main { max-width: none; padding: 0; }
 .player-bar button { background: #1a2238; border: 1px solid #2c3758; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
 .player-bar button.on { background: var(--gold); color: #1b1608; border-color: var(--gold); }
 .player-root { position: relative; flex: 1; overflow: hidden; }
+/* phones held sideways: the bar floats over the stage (which gets the full height) and fades when idle */
+@media (max-height: 560px) {
+  .player-wrap .player-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 40; background: rgba(10, 14, 24, .86);
+    flex-wrap: nowrap; overflow-x: auto; transition: opacity .25s, transform .25s; }
+  .player-wrap.bar-idle .player-bar { opacity: 0; transform: translateY(-100%); pointer-events: none; }
+  .player-wrap .player-bar input[type=range] { width: 64px; }
+  .player-wrap .player-bar .ttl { min-width: 4em; }
+  .player-wrap .boxpanel { z-index: 41; }
+}
 
 .stage { position: absolute; left: 50%; top: 50%; width: 1280px; height: 720px; overflow: hidden; background: #000; transform-origin: center; user-select: none; cursor: pointer; }
 .layer { position: absolute; inset: 0; isolation: isolate; }  /* z-index set by 38 / 69 stays inside its layer */

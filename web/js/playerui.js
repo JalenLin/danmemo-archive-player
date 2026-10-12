@@ -59,6 +59,16 @@ export function mountPlayer(container, key, opts) {
   };
   ctl.stop = () => { ctl.stopped = true; cleanup(); container.innerHTML = ''; };
 
+  // the browser's full screen (hides Chrome's address bar and the phone's status bar); the Android app is
+  // full screen already
+  const canFullscreen = () => document.fullscreenEnabled && !/DanMemoApp/.test(navigator.userAgent);
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) return document.exitFullscreen().catch(() => {});
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+      .then(() => screen.orientation?.lock?.('landscape').catch(() => {}))
+      .catch(() => {});
+  };
+
   const open = async (k) => {
     cleanup();
     const novel = await opts.getJSON(`data/novel/${encodeURIComponent(k)}.json`);
@@ -71,7 +81,7 @@ export function mountPlayer(container, key, opts) {
         <button data-a="auto">AUTO</button><button data-a="skip">SKIP</button><button data-a="log">LOG</button><button data-a="hide" title="${t('テキストボックスを隠す（スクリーンショット用・H／右クリック）')}">${t('非表示')}</button>
         <label class="muted">BGM <input type="range" min="0" max="1" step="0.05" data-v="bgm" value="${settings.bgm ?? 0.6}"></label>
         <label class="muted">${t('ボイス')} <input type="range" min="0" max="1" step="0.05" data-v="voice" value="${settings.voice ?? 1}"></label>
-        <button data-a="box">${t('設定')}</button>
+        <button data-a="box">${t('設定')}</button>${canFullscreen() ? `<button data-a="fs" title="${t('全画面')}">⛶</button>` : ''}
       </div>
       <div class="boxpanel hidden">
         <label>${t('色')} <input type="color" data-box="msgColor" value="${settings.msgColor ?? BOX.msgColor}"></label>
@@ -143,7 +153,25 @@ export function mountPlayer(container, key, opts) {
       if (a === 'log') { showLog(rootEl, p, () => b.classList.remove('on')); b.classList.toggle('on', !!rootEl.querySelector('.logpane')); }
       if (a === 'hide') setHidden(!hidden);
       if (a === 'box') { panel.classList.toggle('hidden'); b.classList.toggle('on', !panel.classList.contains('hidden')); }
+      if (a === 'fs') toggleFullscreen();
     });
+    // Phones held sideways (short screens): the bar floats over the stage and fades after a few seconds; a tap
+    // along the top edge (or the mouse there) brings it back.
+    const wrap = container.querySelector('.player-wrap');
+    const shortScreen = window.matchMedia('(max-height: 560px)');
+    let idleT = 0;
+    const wake = () => {
+      wrap.classList.remove('bar-idle');
+      clearTimeout(idleT);
+      if (shortScreen.matches) idleT = setTimeout(() => { if (panel.classList.contains('hidden')) wrap.classList.add('bar-idle'); }, 3000);
+    };
+    wake();
+    bar.addEventListener('pointerdown', wake);
+    rootEl.addEventListener('click', (e) => {
+      if (wrap.classList.contains('bar-idle') && e.clientY - rootEl.getBoundingClientRect().top < 48) { e.stopPropagation(); wake(); }
+    }, true);
+    wrap.addEventListener('mousemove', (e) => { if (e.clientY < 60) wake(); });
+    detachKeys.push(() => clearTimeout(idleT));
     bar.querySelectorAll('input[data-v]').forEach((inp) => (inp.oninput = () => {
       p.settings[inp.dataset.v] = +inp.value;
       if (inp.dataset.v === 'bgm' && p.bgm) p.bgm.volume = +inp.value * (p.bgmLevel ?? 1);

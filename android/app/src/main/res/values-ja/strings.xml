@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="perm_title">ストレージへのアクセス</string>
+    <string name="perm_body">グローバル版 APK と、展開したアプリデータのバックアップを、端末のストレージの DanMemo フォルダ（%1$s）に置いてください。読み込むには「すべてのファイルの管理を許可」が必要です。次の画面でオンにしてください。データはこの端末から外に出ません。</string>
+    <string name="perm_ok">設定を開く</string>
+    <string name="perm_exit">終了</string>
+    <string name="starting">起動中…</string>
+</resources>

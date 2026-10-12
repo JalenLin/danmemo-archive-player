@@ -30,6 +30,16 @@
 
 [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) から `DanMemoPlayer-windows.zip` をダウンロードして展開し、`DanMemoPlayer.exe` を実行します。開いたページでグローバル版 APK（またはメモリアル版の `.xapk`）を選び、展開したアプリデータのバックアップのフォルダを貼り付けて「作成」を押してください。詳しくは zip 内の `README.txt` を参照。以下はソースから作る手順です。
 
+## Android 版（パソコン不要）
+
+[Releases](https://github.com/JalenLin/danmemo-archive-player/releases) から `DanMemoPlayer-android.apk` をダウンロードしてインストールします。Android 7.0 以上の 64 ビット端末が必要です。
+1. 端末のストレージに `DanMemo` フォルダを作り、グローバル版 APK と展開したアプリデータのバックアップ（`contents` フォルダ）を入れます。RAR の分割ファイルは ZArchiver などで展開できます。展開中は RAR と展開結果が両方あるので、約 30 GB の空きが必要です（展開後は RAR を削除して構いません）。
+2. アプリを開き、案内に従って「すべてのファイルの管理を許可」をオンにします（`DanMemo` フォルダを読むため）。
+3. 設定ページが APK とバックアップを自動で見つけるので、「作成」を押します。復号は 5〜10 分ほどです。その間はアプリを前面に表示したままにしてください。
+4. 完了するとフルスクリーンのプレイヤーになります。横向きではツールバーが自動で隠れ、画面の上端をタップすると出てきます。
+
+端末には ffmpeg がないため、CDN からしか取れない一部の `.usm` ムービーは変換されません。バックアップにあるムービーは再生できます。
+
 ## 必要なもの
 
 - Python 3.10 以上、`ffmpeg`（ムービー変換時のみ）
@@ -159,6 +169,7 @@ tools/usm.py             CRI USM → MP4
 tools/gachanames.py      ガチャ演出のネームプレート（build_web.py から呼ばれる）
 tools/serve.py           ローカルサーバー（Range 対応）
 tools/launcher.py        Windows 版のランチャー：ブラウザの設定ページ、設定の自動生成、作成、プレイヤーの提供（packaging/ にビルド設定）
+android/                 Android 版：Chaquopy でアプリ内に launcher.py を動かし、フルスクリーンの WebView で設定ページとプレイヤーを表示
 web/js/i18n.js           画面の文言（日本語をキーに英語／中国語）と日付形式
 tools/smoke.py           プレイヤーのテスト：早送りでシナリオを再生し、停止・コマンドエラー・素材の読み込み失敗を報告（`smoke.py all --workers 10` で全件。Playwright、DANMEMO_URL で URL 指定）
 tools/vidcompare.py      原作の録画と比較：一行ずつスクリーンショットを撮り、動画と対応付けて差の大きい行を一覧にする（ffmpeg・Playwright が必要）
