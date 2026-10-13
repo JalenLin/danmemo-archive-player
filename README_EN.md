@@ -32,8 +32,6 @@ Download `DanMemoPlayer-windows.zip` from [Releases](https://github.com/JalenLin
 
 ## Android app (no computer needed)
 
-> Still being tested, not released yet: Releases carry the Windows app only for now. This is how it will work.
-
 Download `DanMemoPlayer-android.apk` from [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) and install it. It needs Android 7.0 or later on a 64-bit phone.
 
 ### 1. Put the app-data backup on the phone

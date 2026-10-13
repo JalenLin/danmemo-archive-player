@@ -128,14 +128,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # the Android app is still being tested: releases carry the Windows app only for now (the APK stays a
-      # workflow artifact)
       - uses: actions/download-artifact@v4
         with:
           name: DanMemoPlayer-windows
           path: dist
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: DanMemoPlayer-android
+          path: dist
+
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/DanMemoPlayer-windows.zip --title "$GITHUB_REF_NAME" --notes-file packaging/release-notes.md --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" dist/DanMemoPlayer-windows.zip dist/DanMemoPlayer-android.apk --title "$GITHUB_REF_NAME" --notes-file packaging/release-notes.md --verify-tag

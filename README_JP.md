@@ -32,8 +32,6 @@
 
 ## Android 版（パソコン不要）
 
-> テスト中で、まだ公開していません（Releases は現在 Windows 版のみ）。以下は予定している使い方です。
-
 [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) から `DanMemoPlayer-android.apk` をダウンロードしてインストールします。Android 7.0 以上の 64 ビット端末が必要です。
 
 ### 1. アプリデータのバックアップを端末に置く
