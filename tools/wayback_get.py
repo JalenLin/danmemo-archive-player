@@ -5,9 +5,15 @@
   pages:  the JP notice pages that referenced them (titles / bodies / image links), from Wayback only
           (the API hosts are gone). Fetched slowly to be gentle with archive.org.
 
-Output: wayback/img/<md5>.<ext>, wayback/pages/<host>/<name>.html, wayback/pages/index.json.
+  regions: the other clients' in-game web views (global eu / us, Traditional Chinese tw, Korean kr):
+          cdn-danmemo.akamaized.net/<region>/webview/... — notice art, notice pages, help pages. The CDN
+          answers 403 for them now, so Wayback only. The JP set above is not fetched again.
+
+Output: wayback/img/<md5>.<ext>, wayback/pages/<host>/<name>.html, wayback/pages/index.json;
+regions: $WB_REGIONS_OUT (default wayback_regions/)/<region>/<path under webview/>, plus cdx_<region>.txt;
+WB_REGIONS picks some of them (space-separated).
 Resumable; re-running only fetches what is missing.
-Usage: python tools/wayback_get.py [images|pages|all]
+Usage: python tools/wayback_get.py [images|pages|all|regions]   (WB_PAGES_SET=us: the global notice pages)
 """
 import hashlib
 import json
@@ -25,6 +31,8 @@ OUT = os.path.join(ROOT, "wayback")
 CDN = "https://cdn-danmemo.akamaized.net/"
 UA = {"User-Agent": "danmemo-archive-player (personal archive; contact via project owner)"}
 PAGE_HOSTS = ["news-danmemo.wfs.games/external/notice/*", "api-danmemo.wrightflyer.net/asset/notice/*"]
+# WB_PAGES_SET=us: the global (US) client's notice and gacha-detail pages instead, into $WB_PAGES_OUT
+PAGE_SETS = {"us": ["api-danmemo-us.wrightflyer.net/asset/notice/*", "api-danmemo-eu.wrightflyer.net/asset/notice/*"]}
 
 
 def fetch(url, timeout=60, tries=4, wait=5):
@@ -97,8 +105,14 @@ def page_key(url):
 
 
 def pages():
+    global OUT
+    which = os.environ.get("WB_PAGES_SET")
+    hosts = PAGE_SETS[which] if which else PAGE_HOSTS
+    if which:
+        OUT = os.environ.get("WB_PAGES_OUT") or os.path.join(ROOT, f"wayback_{which}")
+        os.makedirs(os.path.join(OUT, "pages"), exist_ok=True)
     rows = []
-    for i, pat in enumerate(PAGE_HOSTS):
+    for i, pat in enumerate(hosts):
         rows += cdx(pat, f"pages{i}")
     best = {}
     for r in rows:  # keep the latest capture of each notice
@@ -145,7 +159,68 @@ def pages():
     print("pages done", len(index), "fails", fails, flush=True)
 
 
+REGIONS = ["eu", "us", "tw", "kr"]  # "jp" on request: the JP web views other than notice/img (images() has those)
+
+
+def regions():
+    out = os.environ.get("WB_REGIONS_OUT") or os.path.join(ROOT, "wayback_regions")
+    os.makedirs(out, exist_ok=True)
+    import threading
+    from collections import Counter
+    for reg in (os.environ.get("WB_REGIONS") or " ".join(REGIONS)).split():  # e.g. WB_REGIONS="eu tw"
+        path = os.path.join(out, f"cdx_{reg}.txt")
+        if not os.path.exists(path):
+            q = urllib.parse.urlencode({"url": "cdn-danmemo.akamaized.net/webview/*" if reg == "jp" else
+                                        f"cdn-danmemo.akamaized.net/{reg}/webview/*",
+                                        "fl": "original,timestamp,mimetype,length",
+                                        "filter": "statuscode:200", "collapse": "urlkey", "limit": 200000})
+            open(path, "wb").write(fetch(f"http://web.archive.org/cdx/search/cdx?{q}", timeout=300, tries=8, wait=30))
+        rows = [l.split() for l in open(path, encoding="utf-8") if l.strip()]
+        if reg == "jp":  # notice/img is the earlier JP set (wayback/img): not again
+            rows = [r for r in rows if "/notice/img/" not in r[0]]
+        stats, lock = Counter(), threading.Lock()
+
+        def one(r):
+            url, ts = r[0], r[1]
+            rel = urllib.parse.urlsplit(url).path.split("/webview/", 1)[1]
+            q = urllib.parse.urlsplit(url).query
+            if q:  # keep cache-busted variants apart, file-system safe
+                rel += "_" + re.sub(r"[^\w.-]", "_", q)[:60]
+            dst = os.path.join(out, reg, rel)
+            if os.path.exists(dst):
+                return "skip"
+            data = None
+            if reg == "jp":  # the JP CDN still serves much of it
+                try:
+                    data = fetch(url.split("?")[0].replace("http://", "https://"), tries=1)
+                except Exception:
+                    data = None
+            if data is None:
+                try:
+                    data = fetch(f"http://web.archive.org/web/{ts}id_/{url.replace('&amp;', '&')}", timeout=120)
+                except Exception:
+                    return "fail"
+            name = os.path.basename(rel).split(".")[0]
+            if re.fullmatch(r"[0-9a-f]{32}", name) and hashlib.md5(data).hexdigest() != name:
+                return "badmd5"  # an archived error page or a truncated capture
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            open(dst + ".tmp", "wb").write(data)
+            os.replace(dst + ".tmp", dst)
+            time.sleep(0.5)
+            return "ok"
+
+        print(f"{reg}: {len(rows)} captures", flush=True)
+        with ThreadPoolExecutor(max_workers=int(os.environ.get("WB_WORKERS", 4))) as ex:
+            for i, s in enumerate(ex.map(one, rows), 1):
+                stats[s] += 1
+                if i % 500 == 0 or i == len(rows):
+                    print(f"  {reg} {i}/{len(rows)} {dict(stats)}", flush=True)
+
+
 if __name__ == "__main__":
+    if sys.argv[1:] == ["regions"]:
+        regions()
+        sys.exit()
     what = sys.argv[1] if len(sys.argv) > 1 else "all"
     os.makedirs(os.path.join(OUT, "pages"), exist_ok=True)
     if what in ("images", "all"):
