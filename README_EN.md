@@ -35,12 +35,45 @@ Download `DanMemoPlayer-windows.zip` from [Releases](https://github.com/JalenLin
 > Still being tested, not released yet: Releases carry the Windows app only for now. This is how it will work.
 
 Download `DanMemoPlayer-android.apk` from [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) and install it. It needs Android 7.0 or later on a 64-bit phone.
-1. Make a `DanMemo` folder in the phone's storage and put the global APK and the extracted app-data backup (the `contents` folder) in it. ZArchiver can extract the RAR parts. While extracting, the RAR parts and the extracted files coexist: have about 30 GB free (delete the RAR parts afterwards).
-2. Open the app and allow "manage all files" when asked (to read the `DanMemo` folder).
-3. The setup page finds the APK and the backup by itself; tap Build. Decryption takes about 5–10 minutes; keep the app in the foreground meanwhile.
-4. Then the player opens full screen. Held sideways, its toolbar hides itself; tap the top edge to bring it back.
 
-There is no ffmpeg on the phone, so the `.usm` cutscene movies can't be converted: the Android app has no cutscene movies for now (stories skip them; everything else plays).
+### 1. Put the app-data backup on the phone
+
+Either:
+- **Extract it on the phone**: copy the RAR parts to the phone (e.g. `Download/danmemo`) and extract them with RAR or ZArchiver.
+  - While extracting, the RAR parts and the extracted files both exist, so have about 30 GB free: the parts are about 11.5 GB and the extracted backup about 14 GB.
+  - You can delete the RAR parts afterwards.
+- **Extract it on a computer**, then copy the `contents` folder to the phone over USB.
+
+This step takes a while: about **2 h 10 min** on a Pixel 10 Pro (plugged in, screen on). What makes it slow is the **number** of files, not their size: the backup has about 260,000 files, and Android passes every file written to shared storage through its media handling.
+
+To speed it up:
+- Set the extractor app's battery usage to **Unrestricted** in the system settings. Newer Android versions pause it about a minute after the screen goes off otherwise.
+- **Keep the screen on** with the extractor in front; best plugged in.
+- Pause Play Store auto-updates: apps installing in the background compete for the same media handling.
+- Before extracting, put an empty file named `.nomedia` in the target folder, so the gallery doesn't fill up with tens of thousands of game images.
+
+Also:
+- Deleting the extracted folder is just as slow (about 1 h 40 min measured). Only delete it if you want to extract again.
+- RAR leaves 0-byte `.rartemp…` files in folders that are empty in the archive. They do no harm.
+
+### 2. Build
+
+1. Open the app and allow "manage all files" when asked. It is used to read the backup folder; the app doesn't change anything in it.
+2. On the setup page, choose the files:
+   - **APK**: the global APK, or the JP memorial app's `.xapk`. This file is copied into the app.
+   - **Backup folder**: tap "Choose folder…" and pick the extracted `contents`, or the folder that holds it. This folder is not copied.
+3. Optionally tick the download of what the backup lacks from the game's CDN (about 1.6 GB).
+4. Tap Build. Without the download it takes about 15–25 minutes: about 16 minutes on a Pixel 10 Pro, 24 on a Pixel 5.
+   - This includes decryption and converting the cutscene movies. The app ships a small ffmpeg (LGPL), so the movies are converted on the phone.
+   - With the screen off or the app in the background the build keeps going, but newer Android versions slow it down a lot. For the fastest build, keep the screen on with the app in front.
+5. When it says Ready, tap "Open the player".
+   - Held sideways, the toolbar hides itself; tap the top edge to bring it back.
+   - Held upright, the toolbar wraps into several rows.
+
+### 3. Settings
+
+- **Language**: the setup page and the player share one language menu (Japanese, English, Chinese).
+- **Keep screen on**: in the player's settings, choose "While playing" (default), "Always" or "Off".
 
 ## Two ways to set it up
 
