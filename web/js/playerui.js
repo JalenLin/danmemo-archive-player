@@ -87,7 +87,7 @@ export function mountPlayer(container, key, opts) {
         <button data-a="auto">AUTO</button><button data-a="skip">SKIP</button><button data-a="log">LOG</button><button data-a="hide" title="${t('テキストボックスを隠す（スクリーンショット用・H／右クリック）')}">${t('非表示')}</button>
         <label class="muted">BGM <input type="range" min="0" max="1" step="0.05" data-v="bgm" value="${settings.bgm ?? 0.6}"></label>
         <label class="muted">${t('ボイス')} <input type="range" min="0" max="1" step="0.05" data-v="voice" value="${settings.voice ?? 1}"></label>
-        <button data-a="box">${t('設定')}</button>${canFullscreen() ? `<button data-a="fs" title="${t('全画面')}">⛶</button>` : ''}
+        <button data-a="box">${t('設定')}</button>${canFullscreen() ? `<button data-a="fs" title="${t('全画面')}" aria-label="${t('全画面')}"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" style="vertical-align:-2px"><path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9"/></svg></button>` : ''}
       </div>
       <div class="boxpanel hidden">
         <label>${t('色')} <input type="color" data-box="msgColor" value="${settings.msgColor ?? BOX.msgColor}"></label>
