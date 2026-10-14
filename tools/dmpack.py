@@ -10,17 +10,29 @@ Assets: every r/<i>/... path in the built data, plus what the player derives fro
 to each .lwf (its textures) and the files a path is the prefix of (portrait faces: <base>.*). Media are stored
 uncompressed (the app reads them at their offset in the pack), the rest is deflated.
 """
+import collections
 import os
 import re
 import sys
 import time
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config
 
 STORED = (".ogg", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".lwf", ".woff2")
 REF = re.compile(r'"(r/(\d+)/[^"]*)"')
+# Files are read ahead in parallel: on Windows the antivirus scans each file as it is opened, and one at a time
+# those waits add up over ~200,000 files. The pack is still written in order by one thread.
+READERS = 16
+AHEAD = 256 << 20  # bytes read ahead at most
+BIG = 32 << 20     # larger files (movies) are streamed by the writer itself
+
+
+def read(path, mode="rb"):
+    with open(path, mode, **({} if "b" in mode else {"encoding": "utf-8"})) as f:
+        return f.read()
 
 
 def walk(top):
@@ -29,12 +41,15 @@ def walk(top):
             yield os.path.join(dp, f)
 
 
+PLAYER = ("index.html", "transparent.png", "js", "css", "vendor", "data")  # as the app bundles them (build.gradle.kts)
+
+
 def player_files(web):
-    """web/ as it is served, minus r/ (the asset roots, linked in by build_web.py)"""
+    """web/ as it is served: the player's own files and its built data (not r/, the asset roots, nor dev files)"""
     out = {}
     for name in os.listdir(web):
         p = os.path.join(web, name)
-        if name == "r":
+        if name not in PLAYER:
             continue
         if os.path.isdir(p):
             for f in walk(p):
@@ -52,9 +67,9 @@ def assets(roots, data):
         out.setdefault(f"r/{i}/" + os.path.relpath(disk, roots[i]).replace(os.sep, "/"), disk)
 
     refs = set()
-    for f in walk(data):
-        if f.endswith(".json"):
-            refs.update(REF.findall(open(f, encoding="utf-8").read()))
+    with ThreadPoolExecutor(READERS) as ex:
+        for text in ex.map(lambda f: read(f, "r"), [f for f in walk(data) if f.endswith(".json")]):
+            refs.update(REF.findall(text))
     for ref, i in sorted(refs):
         i = int(i)
         if i >= len(roots):
@@ -96,17 +111,33 @@ def main(argv=None):
     files = player_files(web)
     found, missing = assets(cfg["asset_roots"], data)
     files.update(found)
-    total = sum(os.path.getsize(f) for f in files.values())
+    size = {f: os.path.getsize(f) for f in files.values()}
+    total = sum(size.values())
     print(f"{len(files)} files, {total / 1e9:.2f} GB" +
           (f"; {len(missing)} referenced paths not found (the player shows those as missing too)" if missing else ""),
           flush=True)
     tmp = dst + ".part"
     done, shown, t0 = 0, -1, time.time()
-    with zipfile.ZipFile(tmp, "w", allowZip64=True) as z:
-        for name, path in sorted(files.items()):
+    items = sorted(files.items())
+    with zipfile.ZipFile(tmp, "w", allowZip64=True) as z, ThreadPoolExecutor(READERS) as ex:
+        queue, ahead, nxt = collections.deque(), 0, 0
+        for i, (name, path) in enumerate(items):
+            while nxt < len(items) and (nxt <= i or (ahead < AHEAD and len(queue) < READERS * 8)):
+                p = items[nxt][1]
+                small = size[p] <= BIG
+                queue.append(ex.submit(read, p) if small else None)
+                ahead += size[p] if small else 0
+                nxt += 1
             kind = zipfile.ZIP_STORED if name.lower().endswith(STORED) else zipfile.ZIP_DEFLATED
-            z.write(path, name, compress_type=kind)
-            done += os.path.getsize(path)
+            job = queue.popleft()
+            if job is None:
+                z.write(path, name, compress_type=kind)
+            else:
+                info = zipfile.ZipInfo.from_file(path, name)
+                info.compress_type = kind
+                z.writestr(info, job.result())
+                ahead -= size[path]
+            done += size[path]
             pct = int(100 * done / max(total, 1)) // 5 * 5
             if pct != shown:
                 print(f"  {pct}%", flush=True)

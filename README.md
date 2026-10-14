@@ -43,6 +43,7 @@
 1. 在電腦上用 Windows 版建置完成後，按設定頁的「打包給 Android App」。
    - 用原始碼的話，執行 `python tools/dmpack.py`。
    - 會在 `DanMemoPlayer.exe` 旁邊產生 `DanMemo.dmpack`，裡面只有播放器和劇情用到的素材，例如國際版約 8.7 GB。
+   - 打包要讀約 20 萬個檔案，Windows Defender 會逐一掃描。把 `work` 和備份資料夾都加入排除項目會快很多。
 2. 把手機用 USB 接上電腦，選「檔案傳輸」，再把 `DanMemo.dmpack` 複製到手機內部儲存空間的 `DanMemo` 資料夾，直接放在資料夾裡，不要放進子資料夾。
    - 只有一個大檔案，所以很快：Pixel 10 Pro 約 2 分鐘。
 3. 開啟 App，允許「管理所有檔案」，就會直接開啟播放器。

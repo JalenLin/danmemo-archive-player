@@ -39,7 +39,9 @@ def run(job):
 
         pg.on("console", on_console)
         pg.on("pageerror", lambda e: cur["r"] is not None and cur["r"]["errors"].append("Uncaught " + str(e)[:200]))
-        pg.on("response", lambda r: cur["r"] is not None and r.status >= 400 and cur["r"]["http"].append(f"{r.status} {r.url.split('/', 3)[-1]}"))
+        # setup/status: the page asks whether a setup page is there (only the Windows / Android app has one)
+        pg.on("response", lambda r: cur["r"] is not None and r.status >= 400 and not r.url.endswith("/setup/status")
+              and cur["r"]["http"].append(f"{r.status} {r.url.split('/', 3)[-1]}"))
         for i, k in enumerate(keys):
             r = cur["r"] = {"key": k, "errors": [], "http": [], "timeout": None, "sec": 0}
             t0 = time.time()

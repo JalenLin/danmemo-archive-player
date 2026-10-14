@@ -105,6 +105,8 @@ if (langSel) {
   langSel.onchange = () => { setLang(langSel.value); applyStatic(); route(); };
 }
 applyStatic();
+// the Windows / Android app's setup page (rebuild, pack for the Android app); not there with tools/serve.py or a pack
+fetch('setup/status').then((r) => { if (r.ok) document.getElementById('setup-link').hidden = false; }).catch(() => {});
 getJSON('data/album.json').then((al) => { if (!hasAlbum(al)) document.querySelector('.top nav a[href="#/album"]')?.remove(); }).catch(() => {});
 
 // ------------------------------------------------------------------ pages

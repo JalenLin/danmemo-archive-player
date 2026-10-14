@@ -1,47 +1,25 @@
-**v1.2.0 — pack on a computer, play on the phone**
+**v1.2.1 — packing on Windows: faster, and easier to find**
 
-New: with a computer, the Android app no longer needs the backup on the phone or a build there.
+- **"Pack for the Android app" is easier to find:** after the first build the exe opens the player directly, so the setup page (and its pack button) was out of reach. The player's menu now has **Setup**, which leads back to it (also to rebuild).
+- **Faster packing:** Windows Defender scans every file as it is opened, and packing reads ~200,000 of them. They are now read ahead in parallel. Adding both the `work` folder and the backup folder to Defender's exclusions speeds it up further.
+- The pack holds only the player's own files and the assets the stories use (no development files).
 
-1. Build with the Windows app as before, then click **"Pack for the Android app"** on the setup page (from source: `python tools/dmpack.py`). It writes `DanMemo.dmpack` next to the exe: the player and only the assets the stories use (~8.7 GB for the global build).
-2. Copy `DanMemo.dmpack` into the `DanMemo` folder of the phone's internal storage (USB, "File transfer"). One big file copies quickly: ~2 minutes on a Pixel 10 Pro, instead of the hours that ~260,000 small files take.
-3. Open the app and allow "manage all files": it plays from the pack, with nothing to set up.
+**Updating:** Windows — replace `DanMemoPlayer.exe` and the `_internal` folder, keep your `work` folder; no rebuild needed. Android — install the new APK over the old one; a pack made with v1.2.0 keeps working.
 
-The pack holds your own game data: keep it to your own devices, don't share it. App updates bring the new player code without a new pack. Building on the phone, without a computer, works as before.
-
-Android: the sound stops when you leave the app (home screen, another app) and goes on when you come back; AUTO waits meanwhile. The app also keeps the phone less busy in the background.
-
-**Updating:** Android — install the new APK over the old one. Windows — replace `DanMemoPlayer.exe` and the `_internal` folder, keep your `work` folder; no rebuild needed.
+See v1.2.0 for packing on a computer and playing on the phone. No game data or keys are included; the pack holds your own game data, so keep it to your own devices.
 
 ---
 
-**DanMemoPlayer-windows.zip** — Windows app, no Python needed.
+**中文**：
+- **更容易找到「打包給 Android App」**：第一次建置後，exe 會直接開啟播放器，所以之前找不到設定頁和打包按鈕。現在播放器的選單多了「建置設定」，可以回到設定頁打包或重新建置。
+- **打包變快**：Windows Defender 會在每個檔案被開啟時掃描，而打包要讀約 20 萬個檔案。現在改成平行預讀。把 `work` 和備份資料夾都加入 Defender 的排除項目會更快。
+- 打包檔只收播放器本身和劇情用到的素材，不含開發用檔案。
 
-1. Unzip and run `DanMemoPlayer.exe`. A setup page opens in your browser.
-2. Choose the global APK (`com.eu.danmemo_2023-12-22.apk`) or the JP memorial app's `.xapk`, paste the folder of your extracted app-data backup, and click Build. It takes a few minutes, plus the optional download (~1.6 GB) of what the backup lacks.
-3. Open the player. Next time the exe opens the player directly.
+**更新方式**：Windows 用新的 `DanMemoPlayer.exe` 和 `_internal` 資料夾取代舊的，保留 `work` 資料夾，不必重新建置。Android 直接安裝新版 APK 覆蓋，用 v1.2.0 做的打包檔可以繼續使用。
 
-**DanMemoPlayer-android.apk** — Android 7.0 or later, 64-bit. Play from a pack made on a computer (above), or build on the phone: put the extracted backup on the phone, choose the APK and the backup folder in the app, and tap Build (~15–25 minutes). See the README.
+**日本語**：
+- **「Android アプリ用にまとめる」が見つけやすくなりました**：初回の作成後は exe がプレイヤーを直接開くため、設定ページ（とまとめるボタン）に戻れませんでした。プレイヤーのメニューに「セットアップ」を追加し、設定ページに戻ってまとめたり作り直したりできます。
+- **まとめるのが速くなりました**：Windows Defender はファイルを開くたびにスキャンし、まとめる処理は約 20 万ファイルを読みます。並列で先読みするようにしました。`work` フォルダとバックアップのフォルダを Defender の除外に入れるとさらに速くなります。
+- パックにはプレイヤー本体とストーリーで使う素材だけが入ります（開発用ファイルは入りません）。
 
-The exe isn't signed, so Windows SmartScreen may warn on first run ("More info" → "Run anyway"). No game data or keys are included: you need your own copy of the game data. Keys, decrypted data and the player's data stay on your devices; don't share them.
-
----
-
-**中文**：v1.2.0 新增「電腦打包」。有電腦的話，Android App 不用再把備份放進手機，也不用在手機上建置。
-
-1. 照常用 Windows 版建置，再按設定頁的「打包給 Android App」（用原始碼的話執行 `python tools/dmpack.py`）。會在 exe 旁邊產生 `DanMemo.dmpack`，裡面只有播放器和劇情用到的素材，國際版約 8.7 GB。
-2. 用 USB（檔案傳輸）把 `DanMemo.dmpack` 複製到手機內部儲存空間的 `DanMemo` 資料夾。只有一個大檔案，Pixel 10 Pro 約 2 分鐘；搬約 26 萬個小檔案則要好幾個小時。
-3. 開啟 App，允許「管理所有檔案」，就會直接從打包檔播放，不用任何設定。
-
-打包檔裡是你自己的遊戲資料，請只用在自己的裝置上，不要分享。App 更新後，播放器程式會自動用新版，不用重新打包。沒有電腦的話，照舊在手機上建置即可。
-
-Android：離開 App（回桌面、切到其他 App）時聲音會停，回來後接著播放，AUTO 也會等你回來；在背景時也更省電。**更新方式**：Android 直接安裝新版 APK 覆蓋；Windows 用新的 `DanMemoPlayer.exe` 和 `_internal` 資料夾取代舊的，保留 `work` 資料夾，不必重新建置。本程式不含任何遊戲資料或金鑰。
-
-**日本語**：v1.2.0 で「パソコンでまとめる」を追加しました。パソコンがあれば、Android アプリのためにバックアップを端末に移したり、端末で作成したりする必要はありません。
-
-1. いつも通り Windows 版で作成し、設定ページの「Android アプリ用にまとめる」を押します（ソースからは `python tools/dmpack.py`）。exe の隣に `DanMemo.dmpack` ができます。中身はプレイヤーとストーリーで使う素材だけで、グローバル版なら約 8.7 GB です。
-2. `DanMemo.dmpack` を USB（ファイル転送）で端末の内部ストレージの `DanMemo` フォルダにコピーします。大きなファイル 1 つなので Pixel 10 Pro で約 2 分でした（約 26 万の小さなファイルなら数時間かかります）。
-3. アプリを開いて「すべてのファイルの管理を許可」をオンにすれば、パックからそのまま再生できます。
-
-中身は自分のゲームデータです。自分の端末だけで使い、共有しないでください。アプリを更新するとプレイヤーのプログラムも新しくなるので、まとめ直す必要はありません。パソコンがない場合は、これまで通り端末上で作成できます。
-
-Android：アプリを離れると（ホーム画面、別のアプリ）音が止まり、戻ると続きから再生します。その間 AUTO も待ちます。バックグラウンドでの電池消費も減りました。**更新方法**：Android は新しい APK をそのままインストール、Windows は新しい `DanMemoPlayer.exe` と `_internal` フォルダで置き換え、`work` フォルダは残してください（作り直し不要）。ゲームデータや鍵は含まれていません。
+**更新方法**：Windows は新しい `DanMemoPlayer.exe` と `_internal` フォルダで置き換え、`work` フォルダは残してください（作り直し不要）。Android は新しい APK をそのままインストールしてください。v1.2.0 で作ったパックもそのまま使えます。

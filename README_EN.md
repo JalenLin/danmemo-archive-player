@@ -41,6 +41,7 @@ With a computer, packing there is the quick way: the backup never goes onto the 
 1. Build with the Windows app, then click "Pack for the Android app" on the setup page.
    - From source: `python tools/dmpack.py`.
    - This writes `DanMemo.dmpack` next to `DanMemoPlayer.exe`. It holds the player and only the assets the stories use, e.g. ~8.7 GB for the global build.
+   - Packing reads ~200,000 files, and Windows Defender scans each one: with both the `work` folder and the backup folder in its exclusions it is much faster.
 2. Connect the phone by USB, choose "File transfer", and copy `DanMemo.dmpack` into the `DanMemo` folder of the phone's internal storage (directly, not into a subfolder).
    - It is one big file, so this is quick: ~2 minutes on a Pixel 10 Pro.
 3. Open the app and allow "manage all files": it opens the player straight away.

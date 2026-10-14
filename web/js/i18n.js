@@ -30,6 +30,7 @@ const D = {
   'カード': ['Cards', '卡片'],
   'キャラストーリー': ['Character Stories', '角色劇情'],
   '立ち絵': ['Portraits', '角色立繪'],
+  'セットアップ': ['Setup', '建置設定'],
   'キャラストーリー →': ['Character Stories →', '角色劇情 →'],
   '立ち絵 →': ['Portraits →', '角色立繪 →'],
   'その他のシナリオ': ['Other Scenarios', '其他劇情'],
