@@ -69,8 +69,10 @@
     <div style="margin-top:12px; display:flex; gap:12px; align-items:center; flex-wrap:wrap">
       <button id="go"></button>
       <a class="play" id="play" href="/" style="display:none" data-t="open"></a>
+      <button id="pack" style="display:none" data-t="pack"></button>
       <span id="state" class="muted"></span>
     </div>
+    <div id="packmsg" class="muted" style="margin-top:8px; display:none"></div>
   </div>
 
   <pre id="log"></pre>
@@ -87,7 +89,9 @@ const T = {
         pickapk: 'APK', pickdump: 'Backup folder', check: 'Use this folder', pick: 'Choose folder…', uploading: 'copying…', uploaded: 'saved',
         noteapp: 'The build takes a few minutes (decryption about 5–10 on a phone), plus the download if chosen. It keeps going with the screen off or in the background, but newer Android versions slow it down a lot there: keep the screen on with this app in front for the fastest build.',
         howapp: 'Choose the folder of the extracted backup (contents, or a folder that holds it), or put it in the data folder above. Nothing is copied.',
-        howdump: 'Paste the path of the extracted backup (e.g. D:\\danmemo\\contents, or the folder that holds it). Nothing is copied.' },
+        howdump: 'Paste the path of the extracted backup (e.g. D:\\danmemo\\contents, or the folder that holds it). Nothing is copied.',
+        pack: 'Pack for the Android app', packed: 'For the Android app: copy {f} to the DanMemo folder of the phone\'s storage. The app then opens the player from it, with no setup on the phone. It holds your own game data: keep it to your own devices.',
+        packapp: 'Have a computer? Build there (much faster), choose “Pack for the Android app”, and copy the .dmpack file it makes into the data folder above: the app then plays from it, with nothing to set up here.' },
   zh: { intro: '用你自己的遊戲資料建置劇情播放器。所有資料都留在這台裝置上。',
         datafolder: '資料資料夾', apk: '金鑰來源', dump: 'App 資料備份', none: '找不到',
         download: '從遊戲 CDN 補下載備份缺少的素材（約 1.6 GB，主要是活動語音和少數圖片）',
@@ -97,7 +101,9 @@ const T = {
         pickapk: 'APK', pickdump: '備份資料夾', check: '使用這個資料夾', pick: '選擇資料夾…', uploading: '複製中…', uploaded: '已存好',
         noteapp: '建置約需幾分鐘（手機上解密約 5〜10 分鐘），勾選補下載的話再加上下載時間。螢幕熄掉或切到背景時建置仍會繼續，但新版 Android 會讓它慢很多；想快一點的話，請讓螢幕亮著、這個 App 留在前景。',
         howapp: '選擇解壓好的備份資料夾（contents 或包含它的資料夾），或直接放進上面的資料資料夾。不會複製檔案。',
-        howdump: '貼上解壓後的備份所在路徑（例如 D:\\danmemo\\contents，或它的上一層資料夾）。不會複製檔案。' },
+        howdump: '貼上解壓後的備份所在路徑（例如 D:\\danmemo\\contents，或它的上一層資料夾）。不會複製檔案。',
+        pack: '打包給 Android App', packed: 'Android App 用：把 {f} 複製到手機儲存空間的 DanMemo 資料夾，App 就會直接用它開啟播放器，手機上不用再建置。檔案裡是你自己的遊戲資料，請只用在自己的裝置上。',
+        packapp: '有電腦的話：在電腦上建置（快很多），按「打包給 Android App」，再把產生的 .dmpack 檔複製到上面的資料資料夾，App 就會直接用它播放，這裡不用再建置。' },
   ja: { intro: '自分のゲームデータからシナリオプレイヤーを作成します。データはこの端末から外に出ません。',
         datafolder: 'データフォルダ', apk: '鍵の取得元', dump: 'アプリデータのバックアップ', none: '見つかりません',
         download: 'バックアップに足りない素材をゲームの CDN からダウンロード（約 1.6 GB、主にイベントボイス）',
@@ -107,7 +113,9 @@ const T = {
         pickapk: 'APK', pickdump: 'バックアップのフォルダ', check: 'このフォルダを使う', pick: 'フォルダを選ぶ…', uploading: 'コピー中…', uploaded: '保存しました',
         noteapp: '作成は数分ほど（端末での復号は 5〜10 分ほど）、ダウンロードする場合はその時間が加わります。画面オフやバックグラウンドでも作成は続きますが、新しい Android ではかなり遅くなります。早く終わらせたい場合は、画面をつけたままこのアプリを前面にしておいてください。',
         howapp: '展開したバックアップのフォルダ（contents、またはそれを含むフォルダ）を選ぶか、上のデータフォルダに置いてください。ファイルはコピーしません。',
-        howdump: '展開したバックアップのパスを貼り付けてください（例：D:\\danmemo\\contents、またはその上のフォルダ）。ファイルはコピーしません。' },
+        howdump: '展開したバックアップのパスを貼り付けてください（例：D:\\danmemo\\contents、またはその上のフォルダ）。ファイルはコピーしません。',
+        pack: 'Android アプリ用にまとめる', packed: 'Android アプリ用：{f} を端末ストレージの DanMemo フォルダにコピーしてください。アプリはそのファイルからプレイヤーを開くので、端末での作成は不要です。中身は自分のゲームデータなので、自分の端末だけで使ってください。',
+        packapp: 'パソコンがあれば：パソコンで作成し（ずっと速い）、「Android アプリ用にまとめる」で作った .dmpack ファイルを上のデータフォルダにコピーすれば、ここでの作成なしでそのまま再生できます。' },
 };
 // the player's language setting (dm.lang, same origin), else the system language
 const pickLang = () => {
@@ -124,6 +132,8 @@ const applyLang = (code) => {
   if (window.DanMemoApp) {
     document.querySelector('[data-t=howdump]').textContent = L.howapp;
     document.querySelector('[data-t=note]').textContent = L.noteapp;
+    $('packmsg').textContent = L.packapp;
+    $('packmsg').style.display = '';
   }
 };
 const $ = (id) => document.getElementById(id);
@@ -137,6 +147,11 @@ const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<'
 $('go').onclick = async () => {
   $('go').disabled = true;
   await fetch('/setup/build', { method: 'POST', body: JSON.stringify({ download: $('dl').checked }) });
+  poll();
+};
+$('pack').onclick = async () => {
+  $('pack').disabled = true;
+  await fetch('/setup/pack', { method: 'POST' });
   poll();
 };
 $('apkfile').onchange = () => {
@@ -177,6 +192,12 @@ async function poll() {
   $('go').textContent = s.built ? L.rebuild : L.build;
   $('go').disabled = !ready || s.state === 'running';
   $('play').style.display = s.built && s.state !== 'running' ? '' : 'none';
+  if (!window.DanMemoApp) {  // packing is for a computer's build
+    $('pack').style.display = s.built ? '' : 'none';
+    $('pack').disabled = s.state === 'running';
+    $('packmsg').style.display = s.pack ? '' : 'none';
+    if (s.pack) $('packmsg').innerHTML = esc(L.packed).replace('{f}', `<code>${esc(s.pack)}</code>`);
+  }
   $('state').textContent = s.state === 'running' ? `${L.running} ${s.step || ''}` : s.state === 'done' ? L.done : s.state === 'error' ? L.error : '';
   const log = s.log.join('\n');
   if (log !== lastLog) { $('log').textContent = log; $('log').scrollTop = 1e9; lastLog = log; }

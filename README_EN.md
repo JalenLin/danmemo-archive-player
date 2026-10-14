@@ -30,9 +30,28 @@ Game images shown are copyright of their respective owners. No game data comes w
 
 Download `DanMemoPlayer-windows.zip` from [Releases](https://github.com/JalenLin/danmemo-archive-player/releases), unzip it and run `DanMemoPlayer.exe`. On the page that opens, choose the global APK (or the JP memorial app's `.xapk`), paste the folder of your extracted app-data backup and click Build. See `README.txt` in the zip. The rest of this file describes building from source.
 
-## Android app (no computer needed)
+## Android app
 
 Download `DanMemoPlayer-android.apk` from [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) and install it. It needs Android 7.0 or later on a 64-bit phone.
+
+With a computer, packing there is the quick way: the backup never goes onto the phone and nothing is built on it. Without one, build on the phone (steps 1–3 below).
+
+### With a computer: pack there, play on the phone
+
+1. Build with the Windows app, then click "Pack for the Android app" on the setup page.
+   - From source: `python tools/dmpack.py`.
+   - This writes `DanMemo.dmpack` next to `DanMemoPlayer.exe`. It holds the player and only the assets the stories use, e.g. ~8.7 GB for the global build.
+2. Connect the phone by USB, choose "File transfer", and copy `DanMemo.dmpack` into the `DanMemo` folder of the phone's internal storage (directly, not into a subfolder).
+   - It is one big file, so this is quick: ~2 minutes on a Pixel 10 Pro.
+3. Open the app and allow "manage all files": it opens the player straight away.
+
+Notes:
+- The pack holds your own game data: keep it to your own devices, don't share it.
+- The app looks for packs when it starts. If it was open while you copied, close it fully and open it again.
+- App updates bring the new player code without a new pack. Pack again only after rebuilding on the computer (e.g. after downloading missing assets).
+- With a pack in place, the app doesn't use a build on the phone. To build on the phone instead, move the pack out of the `DanMemo` folder.
+
+To build on the phone, without a computer:
 
 ### 1. Put the app-data backup on the phone
 
@@ -271,7 +290,8 @@ tools/usm.py             CRI USM → MP4
 tools/gachanames.py      gacha name plates (called by build_web.py)
 tools/serve.py           local server with HTTP Range support
 tools/launcher.py        the Windows app's launcher: setup page in the browser, writes the config, runs the build, serves the player (packaging/ holds the build spec)
-android/                 the Android app: Chaquopy runs launcher.py in-process, a full-screen WebView shows the setup page and the player
+android/                 the Android app: Chaquopy runs launcher.py in-process, a full-screen WebView shows the setup page and the player; with a pack it serves the player straight from it (pack_serve.py)
+tools/dmpack.py          packs the player built on a computer and the assets it uses into one .dmpack for the Android app
 web/js/i18n.js           interface strings (Japanese keys → English / Chinese) and date formats
 tools/smoke.py           player test: plays stories in skip mode and reports hangs, command errors and failed asset loads (`smoke.py all --workers 10` for every story; Playwright; set DANMEMO_URL)
 tools/vidcompare.py      compare with a recording of the original game: screenshot every line, align with the video, list the lines that differ most (ffmpeg, Playwright)

@@ -64,6 +64,9 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { asking = false; maybeStart() }
 
     private val userFolder get() = File(Environment.getExternalStorageDirectory(), "DanMemo")
+    // the player built on a computer (tools/dmpack.py) in the user's folder: played from as it is, no setup
+    private val packs get() = userFolder.listFiles { f -> f.isFile && f.name.endsWith(".dmpack") }.orEmpty()
+        .sortedBy { it.name }.map { it.absolutePath }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -183,7 +186,7 @@ class MainActivity : ComponentActivity() {
             if (!Python.isStarted()) Python.start(AndroidPlatform(this))
             val port = Python.getInstance().getModule("android_main")
                 .callAttr("start", app.absolutePath, filesDir.absolutePath, userFolder.absolutePath,
-                    File(applicationInfo.nativeLibraryDir, "libffmpeg.so").absolutePath).toInt()
+                    File(applicationInfo.nativeLibraryDir, "libffmpeg.so").absolutePath, packs.joinToString("\n")).toInt()
             val deadline = System.currentTimeMillis() + 30_000
             while (System.currentTimeMillis() < deadline) {
                 val up = runCatching { Socket().use { it.connect(InetSocketAddress("127.0.0.1", port), 200) } }.isSuccess

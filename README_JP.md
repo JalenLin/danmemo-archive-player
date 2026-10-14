@@ -30,9 +30,28 @@
 
 [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) から `DanMemoPlayer-windows.zip` をダウンロードして展開し、`DanMemoPlayer.exe` を実行します。開いたページでグローバル版 APK（またはメモリアル版の `.xapk`）を選び、展開したアプリデータのバックアップのフォルダを貼り付けて「作成」を押してください。詳しくは zip 内の `README.txt` を参照。以下はソースから作る手順です。
 
-## Android 版（パソコン不要）
+## Android 版
 
 [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) から `DanMemoPlayer-android.apk` をダウンロードしてインストールします。Android 7.0 以上の 64 ビット端末が必要です。
+
+パソコンがあれば「パソコンでまとめる」方法がおすすめです。バックアップを端末に移す必要も、端末で作成する必要もありません。パソコンがない場合は、下の手順 1〜3 で端末上で作成します。
+
+### パソコンあり：パソコンでまとめて、端末で再生
+
+1. Windows 版で作成が終わったら、設定ページの「Android アプリ用にまとめる」を押します。
+   - ソースから使う場合は `python tools/dmpack.py` を実行します。
+   - `DanMemoPlayer.exe` の隣に `DanMemo.dmpack` ができます。中身はプレイヤーとストーリーで使う素材だけで、グローバル版なら約 8.7 GB です。
+2. 端末を USB でパソコンにつなぎ、「ファイル転送」を選んで、`DanMemo.dmpack` を端末の内部ストレージの `DanMemo` フォルダに直接コピーします（サブフォルダには入れないでください）。
+   - 大きなファイル 1 つなので速く、Pixel 10 Pro で約 2 分でした。
+3. アプリを開いて「すべてのファイルの管理を許可」をオンにすると、そのままプレイヤーが開きます。
+
+注意：
+- 中身は自分のゲームデータです。自分の端末だけで使い、共有しないでください。
+- アプリはパックを起動時に探します。コピー中にアプリを開いていた場合は、完全に閉じてから開き直してください。
+- アプリを更新するとプレイヤーのプログラムも新しくなるので、まとめ直す必要はありません。まとめ直すのは、パソコンで作成し直したとき（素材を追加ダウンロードしたときなど）だけです。
+- パックがあると、アプリは端末上で作成したものを使いません。端末で作成したい場合は、パックを `DanMemo` フォルダの外に移してください。
+
+以下は、パソコンなしで端末上で作成する手順です。
 
 ### 1. アプリデータのバックアップを端末に置く
 
@@ -202,7 +221,8 @@ tools/usm.py             CRI USM → MP4
 tools/gachanames.py      ガチャ演出のネームプレート（build_web.py から呼ばれる）
 tools/serve.py           ローカルサーバー（Range 対応）
 tools/launcher.py        Windows 版のランチャー：ブラウザの設定ページ、設定の自動生成、作成、プレイヤーの提供（packaging/ にビルド設定）
-android/                 Android 版：Chaquopy でアプリ内に launcher.py を動かし、フルスクリーンの WebView で設定ページとプレイヤーを表示
+android/                 Android 版：Chaquopy でアプリ内に launcher.py を動かし、フルスクリーンの WebView で設定ページとプレイヤーを表示。パックがあればそこから直接プレイヤーを提供（pack_serve.py）
+tools/dmpack.py          パソコンで作ったプレイヤーと使う素材を 1 つの .dmpack にまとめる（Android アプリ用）
 web/js/i18n.js           画面の文言（日本語をキーに英語／中国語）と日付形式
 tools/smoke.py           プレイヤーのテスト：早送りでシナリオを再生し、停止・コマンドエラー・素材の読み込み失敗を報告（`smoke.py all --workers 10` で全件。Playwright、DANMEMO_URL で URL 指定）
 tools/vidcompare.py      原作の録画と比較：一行ずつスクリーンショットを撮り、動画と対応付けて差の大きい行を一覧にする（ffmpeg・Playwright が必要）

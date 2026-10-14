@@ -40,6 +40,7 @@ WORK = os.path.join(BASE, "work")
 CONFIG = os.path.join(WORK, "config.json")
 SETTINGS = os.path.join(WORK, "settings.json")  # what the user picked on the setup page
 KEYS = os.path.join(WORK, "keys.json")
+PACK = os.path.join(BASE, "DanMemo.dmpack")  # the built player for the Android app (tools/dmpack.py)
 TOOLS = os.path.join(APP, "tools")
 os.environ["DANMEMO_CONFIG"] = CONFIG  # for the tools imported here as well as the steps run in child processes
 os.environ["DANMEMO_KEYS"] = KEYS
@@ -180,6 +181,7 @@ STEPS = [("keys", "Derive the keys from the APK"), ("decrypt", "Decrypt the stor
          ("fill", "Download what the backup lacks from the game's CDN (~1.6 GB, optional)"),
          ("movies", "Convert the cutscene movies (.usm -> .mp4)"),
          ("build", "Build the player's data")]
+PACK_STEP = ("pack", "Pack the player for the Android app")
 
 
 def ffmpeg_dir():
@@ -208,6 +210,9 @@ def run_step(name):
     if name == "decrypt":
         import decrypt_all
         return decrypt_all.main(["decrypt_all.py", "--player"])
+    if name == "pack":
+        import dmpack
+        return dmpack.main(["dmpack.py", PACK])
     if name == "movies":
         import usm
         if not usm.have_ffmpeg():
@@ -234,23 +239,28 @@ class Job:
         if sys.__stdout__:  # the console (or Android's logcat); steps run in-process print into the log instead
             print(line.rstrip("\n"), file=sys.__stdout__, flush=True)
 
-    def start(self, download):
+    def start(self, download, pack=False):
         if self.state == "running":
             return
         self.state = "running"
-        threading.Thread(target=self._run, args=(download,), daemon=True).start()
+        threading.Thread(target=self._run, args=(download, pack), daemon=True).start()
 
-    def _run(self, download):
+    def _run(self, download, pack=False):
         try:
-            found = detect()
-            if not (found["keysrc"] and found["dump"]):
-                for n in found["notes"]:
-                    self.say("! " + n)
-                self.state = "error"
-                return
-            write_config(found)
-            copy_player()
-            for name, title in STEPS:
+            if pack:  # only the pack, of the player as built
+                if not built():
+                    self.state = "error"
+                    return
+            else:
+                found = detect()
+                if not (found["keysrc"] and found["dump"]):
+                    for n in found["notes"]:
+                        self.say("! " + n)
+                    self.state = "error"
+                    return
+                write_config(found)
+                copy_player()
+            for name, title in [PACK_STEP] if pack else STEPS:
                 if name == "fill" and not download:
                     continue
                 if name == "keys" and os.path.exists(KEYS):
@@ -283,7 +293,7 @@ class Job:
                     return
             self.step = None
             self.state = "done"
-            self.say("== Done. Open the player.")
+            self.say("== Done." if pack else "== Done. Open the player.")
         except Exception as e:  # keep the page informative instead of dying silently
             self.say(f"! {type(e).__name__}: {e}")
             self.state = "error"
@@ -343,7 +353,7 @@ def make_handler():
                 found = detect()
                 body = {"found": {"keysrc": found["keysrc"], "dump": found["dump"], "notes": found["notes"]},
                         "data": DATA, "state": JOB.state, "step": JOB.step, "built": built(), "log": JOB.log[-200:],
-                        "ffmpeg": have_ffmpeg()}
+                        "ffmpeg": have_ffmpeg(), "pack": PACK if os.path.exists(PACK) else None}
                 return self._send(200, "application/json", json.dumps(body, ensure_ascii=False).encode())
             if not built() and self.path in ("/", "/index.html"):
                 self.send_response(302); self.send_header("Location", "/setup"); self.end_headers()
@@ -384,6 +394,9 @@ def make_handler():
             if self.path.startswith("/setup/build"):
                 opts = json.loads(self.rfile.read(n) or b"{}")
                 JOB.start(bool(opts.get("download")))
+                return self._send(200, "application/json", b'{"ok":true}')
+            if self.path.startswith("/setup/pack"):
+                JOB.start(False, pack=True)
                 return self._send(200, "application/json", b'{"ok":true}')
             self.send_error(404)
 

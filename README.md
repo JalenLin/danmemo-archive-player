@@ -32,9 +32,28 @@
 
 到 [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) 下載 `DanMemoPlayer-windows.zip`，解壓後執行 `DanMemoPlayer.exe`，在開啟的頁面選擇國際版 APK（或日版紀念版的 `.xapk`）並貼上解壓好的 App 資料備份資料夾，按「開始建置」即可。細節見 zip 裡的 `README.txt`。以下是用原始碼建置的步驟。
 
-## Android 版（不用電腦）
+## Android 版
 
 到 [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) 下載 `DanMemoPlayer-android.apk` 安裝。需要 Android 7.0 以上的 64 位元手機。
+
+有電腦的話，建議用「電腦打包」：不用把備份搬進手機，也不用在手機上建置。沒有電腦的話，照下面第 1〜3 步在手機上建置。
+
+### 有電腦：電腦打包，手機直接播放
+
+1. 在電腦上用 Windows 版建置完成後，按設定頁的「打包給 Android App」。
+   - 用原始碼的話，執行 `python tools/dmpack.py`。
+   - 會在 `DanMemoPlayer.exe` 旁邊產生 `DanMemo.dmpack`，裡面只有播放器和劇情用到的素材，例如國際版約 8.7 GB。
+2. 把手機用 USB 接上電腦，選「檔案傳輸」，再把 `DanMemo.dmpack` 複製到手機內部儲存空間的 `DanMemo` 資料夾，直接放在資料夾裡，不要放進子資料夾。
+   - 只有一個大檔案，所以很快：Pixel 10 Pro 約 2 分鐘。
+3. 開啟 App，允許「管理所有檔案」，就會直接開啟播放器。
+
+注意：
+- 打包檔裡是你自己的遊戲資料，請只用在自己的裝置上，不要分享。
+- App 只在啟動時尋找打包檔。如果複製時 App 開著，請完全關閉後再開。
+- App 更新後，播放器程式會自動用新版，不用重新打包。只有在電腦上重新建置後（例如補下載素材），才需要重新打包。
+- 放了打包檔，App 就不會再使用手機上的建置。要改回在手機上建置，把打包檔移出 `DanMemo` 資料夾即可。
+
+以下是不用電腦、在手機上建置的步驟。
 
 ### 1. 把 App 資料備份放到手機
 
@@ -204,7 +223,8 @@ tools/usm.py            CRI USM → MP4
 tools/gachanames.py     抽卡演出的名牌圖（build_web.py 會呼叫）
 tools/serve.py          本機伺服器（支援 Range）
 tools/launcher.py       Windows 版的啟動程式：瀏覽器設定頁、自動產生設定、依序建置、提供播放器（packaging/ 是打包設定）
-android/                Android 版：Chaquopy 在 App 內執行 launcher.py，全螢幕 WebView 顯示設定頁和播放器
+android/                Android 版：Chaquopy 在 App 內執行 launcher.py，全螢幕 WebView 顯示設定頁和播放器；有打包檔時直接從打包檔提供播放器（pack_serve.py）
+tools/dmpack.py         把電腦上建好的播放器和用到的素材打包成一個 .dmpack，給 Android App 直接播放
 web/js/i18n.js          介面文字（日文為鍵 → 英文／中文）與日期格式
 tools/smoke.py          播放器自動測試：以快轉模式播放劇情，回報卡住、指令錯誤、素材載入失敗（`smoke.py all --workers 10` 跑全部；Playwright；DANMEMO_URL 指定網址）
 tools/vidcompare.py     對照原作錄影：逐句截圖播放器、和影片逐句對齊，列出畫面差異最大的句子（需要 ffmpeg、Playwright）
