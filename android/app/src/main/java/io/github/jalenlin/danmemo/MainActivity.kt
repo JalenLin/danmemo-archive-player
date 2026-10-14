@@ -138,6 +138,22 @@ class MainActivity : ComponentActivity() {
         maybeStart()
     }
 
+    // out of sight (home screen, another app): the page's sound holds (web/js/app.js) and its timers stop, so
+    // nothing plays from the background and the phone isn't kept busy; it all goes on when the app is back
+    override fun onStop() {
+        super.onStop()
+        web.evaluateJavascript("dispatchEvent(new Event('danmemo-pause'))", null)
+        web.onPause()
+        web.pauseTimers()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        web.resumeTimers()
+        web.onResume()
+        web.evaluateJavascript("dispatchEvent(new Event('danmemo-resume'))", null)
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) hideSystemBars()

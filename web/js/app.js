@@ -2,6 +2,36 @@ import { renderChars, renderGacha } from './gallery.js?v=13';
 import { mountPlayer, readSet, store, gapList, keepScreen } from './playerui.js?v=9';
 import { t, period, lang, setLang, LANGS, applyStatic } from './i18n.js';
 
+// The Android app in the background (MainActivity.onPause / onResume): every sound and video holds until it is
+// back — what was playing, and what starts meanwhile (the JS timers are paused too, so the story waits)
+if (window.DanMemoApp) {
+  const live = new Set(), held = new Set();
+  let away = false;
+  const drop = (e) => live.delete(e.target);
+  const play = HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play = function () {
+    if (away) { held.add(this); return Promise.resolve(); }
+    live.add(this);
+    this.addEventListener('pause', drop);
+    this.addEventListener('ended', drop);
+    return play.call(this);
+  };
+  const pause = HTMLMediaElement.prototype.pause;
+  HTMLMediaElement.prototype.pause = function () { held.delete(this); return pause.call(this); };  // stopped meanwhile
+  addEventListener('danmemo-pause', () => {
+    if (away) return;
+    away = true;
+    for (const m of [...live, ...document.querySelectorAll('audio, video')]) if (!m.paused && !m.ended) { held.add(m); pause.call(m); }
+  });
+  addEventListener('danmemo-resume', () => {
+    if (!away) return;
+    away = false;
+    const go = [...held];
+    held.clear();
+    for (const m of go) if (m.src || m.currentSrc) m.play().catch(() => {});
+  });
+}
+
 const view = document.getElementById('view');
 const cache = {};
 const getJSON = async (u) => (cache[u] ??= fetch(u).then((r) => { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }));

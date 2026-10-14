@@ -432,7 +432,8 @@ def main():
     if not os.environ.get("DANMEMO_NO_BROWSER"):
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:
-        srv.serve_forever()
+        # in the Android app nothing stops it: wake rarely; elsewhere Ctrl+C (Windows) waits for the poll
+        srv.serve_forever(3600 if os.environ.get("DANMEMO_INPROCESS") else 0.5)
     except KeyboardInterrupt:
         pass
 

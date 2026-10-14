@@ -116,5 +116,6 @@ def start(apks, player=""):
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), Handler)
     srv.daemon_threads = True
     threading.Thread(target=index, args=(apks,), name="danmemo-pack-index", daemon=True).start()  # listen first
-    threading.Thread(target=srv.serve_forever, name="danmemo-server", daemon=True).start()
+    # nothing stops the server: wake rarely (the default 0.5 s poll keeps waking the phone in the background)
+    threading.Thread(target=srv.serve_forever, args=(3600,), name="danmemo-server", daemon=True).start()
     return port
