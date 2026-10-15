@@ -932,9 +932,46 @@ def main():
             print("name plates: every card with a gacha reveal has an official one")
     except Exception as e:
         print("name plates skipped:", e)
+    game_titles()
 
 
-STATS = [(2, "力"), (16, "耐久"), (32, "器用"), (8, "敏捷"), (4, "魔力")]  # pcAbility field 7 bitmask
+def game_titles():
+    """index.json titles -> the titles the game shows. A novel's own name (novel table field 2) is a staff label
+    ("剣姫、ここに参上（Sのみ）", "…（バトル前）") the game never shows, so the global client left ~9,700 of them
+    in Japanese. Each story list here has the stage's title (translated in the global data); use it, with
+    "(1/2)" when a stage plays several novels. The story tree first, then the album, the character views and
+    the cards; novels that are in none of them (the others list) keep their own name."""
+    shown = {}
+
+    def walk(x):
+        if isinstance(x, dict):
+            ks, title = x.get("novels"), x.get("title")
+            if isinstance(ks, list) and isinstance(title, str) and title.strip():
+                ks = list(dict.fromkeys(k for k in ks if isinstance(k, str)))
+                for i, k in enumerate(ks):
+                    shown.setdefault(k, title.strip() + (f" ({i + 1}/{len(ks)})" if len(ks) > 1 else ""))
+            for v in x.values():
+                walk(v)
+        elif isinstance(x, list):
+            for v in x:
+                walk(v)
+
+    path = f"{WEB}/data/index.json"
+    idx = json.load(open(path, encoding="utf-8"))
+    walk(idx["tree"])
+    for name in ("album", "characters", "gacha"):
+        try:
+            walk(json.load(open(f"{WEB}/data/{name}.json", encoding="utf-8")))
+        except OSError:
+            pass
+    titles = idx["titles"]
+    n = sum(1 for k in titles if k in shown)
+    idx["titles"] = {k: shown.get(k, t) for k, t in titles.items()}
+    json.dump(idx, open(path, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    print("titles: the game's stage title for", n, "of", len(titles), "novels")
+
+
+STATS =[(2, "力"), (16, "耐久"), (32, "器用"), (8, "敏捷"), (4, "魔力")]  # pcAbility field 7 bitmask
 
 # Ability evaluation (letter) thresholds, read from libapp.so static init (0x720xxx, data @0x1bf40f0).
 # Per stat (STATS order): descending [(evaluation index, minimum value)]; index 1=SSS … 12=I.

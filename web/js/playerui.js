@@ -120,7 +120,7 @@ export function mountPlayer(container, key, opts) {
     container.innerHTML = `<div class="player-wrap">
       <div class="player-bar">
         <button data-a="exit">${esc(opts.exitLabel || t('← 目録'))}</button>
-        <span class="ttl">${esc(novel.title || k)}</span>
+        <span class="ttl">${esc(titles[k] || novel.title || k)}</span>
         <button data-a="auto">AUTO</button><button data-a="skip">SKIP</button><button data-a="log">LOG</button><button data-a="hide" title="${t('テキストボックスを隠す（スクリーンショット用・H／右クリック）')}">${t('非表示')}</button>
         <label class="muted">BGM <input type="range" min="0" max="1" step="0.05" data-v="bgm" value="${settings.bgm ?? 0.6}"></label>
         <label class="muted">${t('ボイス')} <input type="range" min="0" max="1" step="0.05" data-v="voice" value="${settings.voice ?? 1}"></label>
@@ -280,7 +280,7 @@ export function mountPlayer(container, key, opts) {
     if (next && opts.segEnd && !opts.segEnd.has(k)) return open(next);
     const end = document.createElement('div');
     end.className = 'endcard';
-    end.innerHTML = `<div style="color:var(--gold-2);font-size:20px">${esc(novel.title || k)}</div>
+    end.innerHTML = `<div style="color:var(--gold-2);font-size:20px">${esc(titles[k] || novel.title || k)}</div>
       ${next ? `<button data-n>${t('次へ：{t}', { t: esc(titles[next] || next) })}</button>` : `<div class="muted">${t('最後のシナリオです')}</div>`}
       <button data-r>${t('もう一度')}</button><button data-x>${esc(opts.exitLabel || t('目録へ'))}</button>`;
     rootEl.appendChild(end);
