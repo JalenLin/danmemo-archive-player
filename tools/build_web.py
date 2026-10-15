@@ -918,6 +918,14 @@ def main():
         # only cards that have a gacha reveal but no official plate (the global data has one for every card,
         # so nothing is drawn there; drawing all 784 took most of this step)
         need = [str(c["id"]) for c in cards if (c.get("gacha") or {}).get("art") and not c["gacha"].get("plate")]
+        # plates drawn by older builds for cards that now have an official one are never shown: drop them, or
+        # they ride along in every pack (~100 MB)
+        pdir = f"{WEB}/data/gachaname"
+        stale = [f for f in (os.listdir(pdir) if os.path.isdir(pdir) else []) if f.endswith(".png") and f[:-4] not in need]
+        for f in stale:
+            os.remove(os.path.join(pdir, f))
+        if stale:
+            print(f"name plates: removed {len(stale)} no longer used")
         if need:
             gachanames.main_from_cards(cards, only=need)
         else:
