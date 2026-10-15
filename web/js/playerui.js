@@ -29,7 +29,7 @@ function applyBox(rootEl, st) {
 
 // Subtitles in two languages: offered only when the build has another language's lines too (index.json
 // "texts"; tools/build_web.py with config "translations"). The choice is per viewer.
-const LANG_NAMES = { ja: '日本語', en: 'English', zh: '中文' };
+const LANG_NAMES = { ja: '日本語', en: '英語', zh: '中国語' };  // in Japanese, as i18n keys
 const langName = (l) => t(LANG_NAMES[l] || l);
 async function subtitles(getJSON, k) {
   const tx = (await getJSON('data/index.json').catch(() => null))?.texts;
