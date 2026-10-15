@@ -27,7 +27,7 @@
 
   "translations": {
     "en": {
-      "_comment": "Optional: an English (global) app-data dump, e.g. contents/1/master/...",
+      "_comment": "Optional: the other language's app-data backup (e.g. the global one's contents/1/master/divide_novel_command_enc) for two-language subtitles: decrypt_all.py --lang en, then build_web.py. Only novel_dirs is needed.",
       "novel_dirs": ["en/novel"],
       "master_dirs": ["en/master"]
     }

@@ -83,8 +83,12 @@ def find_dump(path):
 def detect():
     """{'keysrc': path or None, 'dump': contents folder or None, 'notes': [...]}: what the user picked on the
     setup page, else what lies in data/ next to the program"""
-    found = {"keysrc": None, "dump": None, "notes": []}
+    found = {"keysrc": None, "dump": None, "dump2": None, "notes": []}
     st = settings()
+    if st.get("dump2"):  # optional: another language's backup, for two-language subtitles (only its stories are read)
+        found["dump2"], note = find_dump(st["dump2"])
+        if note:
+            found["notes"].append(note)
     if st.get("apk") and os.path.exists(st["apk"]):
         found["keysrc"] = st["apk"]
     if st.get("dump"):
@@ -136,6 +140,10 @@ def write_config(found):
         "dec": os.path.join(WORK, "dec"), "web": os.path.join(WORK, "web"),
         "cdn": os.path.join(WORK, "cdn"), "downloads": os.path.join(WORK, "assets"),
     }
+    c2 = found.get("dump2")
+    if c2 and os.path.abspath(c2) != os.path.abspath(c):  # its language is told from its text when building
+        cfg["translations"] = {"second": {"novel_dirs": [os.path.join(c2, "1", "master", "divide_novel_command_enc")],
+                                          "master_dirs": [], "detect": True}}
     json.dump(cfg, open(CONFIG, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return cfg
 
@@ -162,11 +170,13 @@ def decrypted():
     except (OSError, ValueError):
         return False
     import decrypt_all
-    for kind, dirs in (("novel", cfg["novel_dirs"]), ("master", cfg["master_dirs"])):
+    sets = [(cfg["dec"], "novel", cfg["novel_dirs"]), (cfg["dec"], "master", cfg["master_dirs"])]
+    sets += [(f"{cfg['dec']}_{lang}", "novel", t["novel_dirs"]) for lang, t in cfg.get("translations", {}).items()]
+    for dec, kind, dirs in sets:
         want = {os.path.basename(f)[:-4] for d in dirs for f in glob.glob(os.path.join(d, "*.enc"))}
         if kind == "master":
             want &= decrypt_all.PLAYER_TABLES
-        have = {os.path.basename(f)[:-5] for f in glob.glob(os.path.join(cfg["dec"], kind, "*.json"))}
+        have = {os.path.basename(f)[:-5] for f in glob.glob(os.path.join(dec, kind, "*.json"))}
         if not want or not want <= have:
             return False
     return True
@@ -209,7 +219,11 @@ def run_step(name):
         return keys.main()
     if name == "decrypt":
         import decrypt_all
-        return decrypt_all.main(["decrypt_all.py", "--player"])
+        code = decrypt_all.main(["decrypt_all.py", "--player"])
+        for lang in cfg.get("translations", {}):  # the second language's stories (its text only)
+            print("Stories of the second backup:", flush=True)
+            code = decrypt_all.main(["decrypt_all.py", "--lang", lang, "--player"]) or code
+        return code
     if name == "pack":
         import dmpack
         return dmpack.main(["dmpack.py", PACK])
@@ -351,7 +365,7 @@ def make_handler():
                 return self._send(200, "text/html; charset=utf-8", open(os.path.join(TOOLS, "launcher.html"), "rb").read())
             if self.path.startswith("/setup/status"):
                 found = detect()
-                body = {"found": {"keysrc": found["keysrc"], "dump": found["dump"], "notes": found["notes"]},
+                body = {"found": {"keysrc": found["keysrc"], "dump": found["dump"], "dump2": found["dump2"], "notes": found["notes"]},
                         "data": DATA, "state": JOB.state, "step": JOB.step, "built": built(), "log": JOB.log[-200:],
                         "ffmpeg": have_ffmpeg(), "pack": PACK if os.path.exists(PACK) else None}
                 return self._send(200, "application/json", json.dumps(body, ensure_ascii=False).encode())
@@ -384,12 +398,19 @@ def make_handler():
                 if os.path.exists(KEYS):
                     os.remove(KEYS)  # derive again from the new APK
                 return self._send(200, "application/json", b'{"ok":true}')
-            if self.path.startswith("/setup/dump"):
+            if self.path.split("?")[0] == "/setup/dump":
                 path = json.loads(self.rfile.read(n) or b"{}").get("path", "")
                 folder, note = find_dump(path)
                 if folder:
                     save_settings(dump=folder)
                 body = json.dumps({"ok": bool(folder), "folder": folder, "note": note}, ensure_ascii=False).encode()
+                return self._send(200, "application/json", body)
+            if self.path.startswith("/setup/dump2"):  # optional, for two-language subtitles; an empty path clears it
+                path = json.loads(self.rfile.read(n) or b"{}").get("path", "").strip()
+                folder, note = find_dump(path) if path else (None, "")
+                if folder or not path:
+                    save_settings(dump2=folder or "")
+                body = json.dumps({"ok": bool(folder) or not path, "folder": folder, "note": note}, ensure_ascii=False).encode()
                 return self._send(200, "application/json", body)
             if self.path.startswith("/setup/build"):
                 opts = json.loads(self.rfile.read(n) or b"{}")

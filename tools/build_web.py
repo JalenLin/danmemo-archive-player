@@ -15,6 +15,7 @@ import struct
 import subprocess
 import os
 import re
+import shutil
 
 
 import sys
@@ -48,6 +49,66 @@ def link_roots():
 
 
 ROOTS = link_roots()
+EPISODE_DIR = re.compile(r"/(voice_episode/[^/]+/)")  # a story's own voice folder (an adventure episode id)
+
+# Subtitles in another language (config "translations": another region's decrypted novels in <dec>_<lang>/novel).
+# The JP and the global scripts have the same commands in the same order, so a line is found by its command index.
+# Lines the other client never translated still hold Japanese: only lines really in that language are kept.
+TEXT_ARGS = {11: (6, 5), 12: (6, 5), 45: (6,), 14: (0, 2, 5)}  # op -> args shown as text (the line(s) first, then the name)
+KANA = re.compile(r"[\u3040-\u30ff]")
+WORDS = re.compile(r"[^\W_]")
+
+
+def is_lang(text, lang):
+    return bool(KANA.search(text)) if lang == "ja" else not KANA.search(text)
+
+
+def other_texts(base_cmds, alt_cmds, lang):
+    """{command index: {arg index: text}} of the lines in `lang`, and how many lines have text at all"""
+    lines, n = {}, 0
+    if len(alt_cmds) != len(base_cmds):
+        return lines, sum(1 for c in base_cmds if c[0] in TEXT_ARGS)
+    for i, (b, a) in enumerate(zip(base_cmds, alt_cmds)):
+        spec = TEXT_ARGS.get(b[0])
+        if not spec or a["2"] != b[0]:
+            continue
+        shown = [j for j in spec[:-1] if j + 1 < len(b) and WORDS.search(b[j + 1])] if b[0] == 14 else \
+                [spec[0]] if spec[0] + 1 < len(b) and WORDS.search(b[spec[0] + 1]) else []
+        if not shown:
+            continue  # no words to translate (……, ！？)
+        n += 1
+        got = {j: str(a.get(str(j + 3), "")) for j in spec}
+        if all(got[j].strip() and is_lang(got[j], lang) for j in shown):
+            lines[str(i)] = {str(j): t for j, t in got.items() if t.strip()}
+    return lines, n
+
+
+def novel_lang(d):
+    """ja or en: the language of the decrypted novels in d, from a spread of their lines"""
+    files = sorted(glob.glob(f"{d}/*.json"))
+    kana = total = 0
+    for f in files[::max(1, len(files) // 400)]:
+        for c in json.load(open(f, encoding="utf-8"))["0"]:
+            t = str(c.get("9", ""))
+            if c.get("2") in (11, 12, 45) and WORDS.search(t):
+                total += 1
+                kana += bool(KANA.search(t))
+    return "ja" if total and kana / total > 0.5 else "en"
+
+
+def alt_langs(base):
+    """lang -> folder of its decrypted novels, for the configured translations that have been decrypted. A
+    translation marked "detect" (the setup page's second backup) gets the language its text is in."""
+    out = {}
+    for key, t in CFG.get("translations", {}).items():
+        d = f"{DEC}_{key}/novel"
+        if os.path.isdir(d) and glob.glob(f"{d}/*.json"):
+            lang = novel_lang(d) if t.get("detect") else key
+            if lang == base:
+                print(f"subtitles: the {key} stories are in {lang} too, the build's own language: no second language")
+            else:
+                out[lang] = d
+    return out
 VOICE = {}
 GACHA_VOICE_ALIAS = {}
 # Cards whose line image exists but whose pc field 75 is empty in both the JP and the global master data;
@@ -166,16 +227,22 @@ def is_native(rel, md5s):
     return False
 
 
-def index_dir(rel_dirs, ext):
-    """basename (without ext) -> web path, scanning asset roots (first root wins)."""
+def index_dir(rel_dirs, ext, every=None):
+    """basename (without ext) -> web path, scanning asset roots (first root wins). Folders are walked in name
+    order, so a name found in several folders resolves the same on every system (Windows lists folders sorted,
+    Linux in no particular order). every: a dict that also gets each name's paths, all of them, in that order."""
     idx = {}
     for web, disk in ROOTS:
         for rd in rel_dirs:
             base = disk + rd
-            for dp, _, fs in os.walk(base):
-                for f in fs:
+            for dp, dirs, fs in os.walk(base):
+                dirs.sort()
+                for f in sorted(fs):
                     if f.endswith(ext):
-                        idx.setdefault(f[: -len(ext)], web + os.path.relpath(os.path.join(dp, f), disk).replace(os.sep, "/"))
+                        path = web + os.path.relpath(os.path.join(dp, f), disk).replace(os.sep, "/")
+                        idx.setdefault(f[: -len(ext)], path)
+                        if every is not None:
+                            every.setdefault(f[: -len(ext)], []).append(path)
     return idx
 
 
@@ -411,7 +478,8 @@ def main():
 
     snd = index_dir(["files/sound/bgm", "files/sound/se"], ".ogg")
     img = index_dir(["files/ui/single_image"], ".jpg")
-    voice = index_dir(["files/sound/voice", "files/sound/voice_common", "files/sound/voice_episode"], ".ogg")
+    voice_all = {}  # the same file name sits in several episode folders, sometimes with a different recording
+    voice = index_dir(["files/sound/voice", "files/sound/voice_common", "files/sound/voice_episode"], ".ogg", voice_all)
     global VOICE, GACHA_VOICE_ALIAS
     VOICE = voice
     # Some gacha-hit voices reuse a story recording: the voice table points them at that file.
@@ -424,7 +492,7 @@ def main():
 
     pinfo_cache = {}
 
-    def resolve(key):
+    def resolve(key, home=None):
         kind, _, name = key.partition(".")
         if kind == "single_image" and key in single:
             return img.get(str(single[key]))
@@ -438,7 +506,8 @@ def main():
         if kind == "se" and key in se:
             return snd.get(se[key].split("/")[-1])
         if kind == "voice":
-            return voice.get("voice_" + name)
+            paths = voice_all.get("voice_" + name)
+            return next((p for h in home or () for p in paths if f"/{h}" in p), paths[0]) if paths else None
         if kind == "scenario_lwf" and key in lwf:
             i = lwf[key]
             return find(f"files/lwf/scenarioLwf/{i}/{i}.lwf")
@@ -459,12 +528,31 @@ def main():
     gaps = {}  # novel key -> {kind: count} of assets no source has (shown in the player and the lists)
     GAP_KIND = {"single_image": "img", "movie_usm": "movie", "novel_portrait": "chara", "scenario_lwf": "fx",
                 "battle_effect": "fx", "voice": "voice", "bgm": "sound", "se": "sound"}
+    stage_eps = collections.defaultdict(set)  # novel key -> the adventure episodes whose stages play it
+    for r in table("adventureStage"):
+        if str(r.get("28", "")).startswith("novel."):
+            stage_eps[r["28"]].add(r["1"])
+    base_lang = CFG.get("lang") or novel_lang(f"{DEC}/novel")
+    alts = alt_langs(base_lang)
+    alt_stats = {lang: collections.Counter() for lang in alts}
+    shutil.rmtree(f"{WEB}/data/text", ignore_errors=True)  # also a language no longer configured
+    for lang in alts:
+        os.makedirs(f"{WEB}/data/text/{lang}", exist_ok=True)
     for f in sorted(glob.glob(f"{DEC}/novel/*.json")):
         cmds = json.load(open(f, encoding="utf-8"))["0"]
         nid = cmds[0]["1"]
         row = novel.get(nid) or novel.get(s32(nid))
         key, title = row["1"], row.get("2", "")
         out, res = [], {}
+        # this story's own voice folders: where a line's file name is also in other folders (reruns, re-recordings)
+        # the copy there is the one. The episodes its stage belongs to, else the folder most of its lines are in.
+        homes = collections.Counter()
+        for c in cmds:
+            for i in range(3, 10):
+                for tok in re.split(r"[\s,]+", str(c.get(str(i), ""))):
+                    if tok.startswith("voice.") and tok[6:] and len(voice_all.get("voice_" + tok[6:], ())) > 0:
+                        homes.update({m.group(1) for p in voice_all["voice_" + tok[6:]] for m in [EPISODE_DIR.search(p)] if m})
+        home = [f"voice_episode/{e}/" for e in sorted(stage_eps.get(key, ()))] + [h for h, _ in homes.most_common(1)]
         for c in cmds:
             args = [str(c.get(str(i), "")) for i in range(3, 10)]
             while args and args[-1] == "":
@@ -477,10 +565,21 @@ def main():
                     if tok.startswith("movie_usm.") and (nid, key) not in movie_refs[tok]:
                         movie_refs[tok].append((nid, key))
                     if keyre.match(tok) and tok not in res:
-                        r = resolve(tok)
+                        r = resolve(tok, home)
                         res[tok] = r
                         if r is None:
                             missing[tok.split(".")[0]] += 1
+        for lang, d in alts.items():
+            alt = os.path.join(d, os.path.basename(f))
+            if not os.path.exists(alt):
+                continue
+            tl, n = other_texts(out, json.load(open(alt, encoding="utf-8"))["0"], lang)
+            st = alt_stats[lang]
+            st["novels"] += 1; st["lines"] += n; st["translated"] += len(tl)
+            st["with_text"] += bool(tl)
+            # written even with no line in that language, so the player tells "untranslated" from "not there"
+            json.dump({"n": n, "lines": tl}, open(f"{WEB}/data/text/{lang}/{key}.json", "w", encoding="utf-8"),
+                      ensure_ascii=False, separators=(",", ":"))
         g = collections.Counter(GAP_KIND[t.split(".")[0]] for t, v in res.items() if v is None and t.split(".")[0] in GAP_KIND)
         doc = {"key": key, "title": title, "cmds": out, "res": res}
         if g:
@@ -492,6 +591,11 @@ def main():
             vref = next((t for t in res if t.startswith("voice.")), None)
             interaction[key] = ("\n".join(c[-1] for c in out if c[0] in (11, 12, 45) and len(c) > 1), vref)
     print("novels", len(novels), "unresolved asset refs", dict(missing))
+    texts = {"base": base_lang, "langs": {}}
+    for lang, st in alt_stats.items():
+        print(f"subtitles {lang}: {st['translated']} of {st['lines']} lines, {st['with_text']} of {len(novels)} novels")
+        if st["translated"]:
+            texts["langs"][lang] = {"novels": st["with_text"], "lines": st["translated"], "of": st["lines"]}
 
     # ---- story tree
     adv = table("adventure")
@@ -717,7 +821,7 @@ def main():
     # alone don't count: the scene still plays)
     shown_gaps = {k: v for k, v in gaps.items() if any(x in v for x in ("img", "movie", "chara", "fx"))}
     print("stories with missing pictures/movies/portraits/effects", len(shown_gaps), "| with any gap", len(gaps))
-    json.dump({"tree": tree, "titles": novels, "ui": ui, "gaps": shown_gaps}, open(f"{WEB}/data/index.json", "w", encoding="utf-8"),
+    json.dump({"tree": tree, "titles": novels, "ui": ui, "gaps": shown_gaps, "texts": texts}, open(f"{WEB}/data/index.json", "w", encoding="utf-8"),
               ensure_ascii=False, separators=(",", ":"))
     json.dump({g: sorted(v) for g, v in sorted(others.items())}, open(f"{WEB}/data/others.json", "w", encoding="utf-8"),
               ensure_ascii=False, separators=(",", ":"))

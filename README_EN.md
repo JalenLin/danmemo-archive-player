@@ -93,6 +93,17 @@ Also:
 - **Language**: the setup page and the player share one language menu (Japanese, English, Chinese).
 - **Keep screen on**: in the player's settings, choose "While playing" (default), "Always" or "Off".
 
+## Subtitles in two languages (optional)
+
+The JP and the global backups each hold one language. With both, the player can show the two together: the line as usual, and the other language smaller under it.
+
+- **Windows / Android**: choose the other backup as "Second-language backup" on the setup page and click Rebuild. Only its stories are read; its language is detected.
+- **From source**: add the other backup's `novel_dirs` under `translations` in `config.json`, run `decrypt_all.py --lang <lang>`, then `build_web.py`.
+- Pick the main and the second language in the player's Settings. With one language the choices don't appear.
+- Names follow the main language.
+- About 300 events the global client never ran have no English. A line missing in a language shows in the other one instead (never the same line twice), and the player says so at the top.
+- Packs for the Android app include the subtitles.
+
 ## Two ways to set it up
 
 | | Setup A: Japanese memorial app | Setup B: global app-data backup |
@@ -268,7 +279,7 @@ Optionally, add the global backup's scripts as a translation source in `config.j
 - AUTO: auto-advance (waits for the voice)
 - LOG: backlog (press again or Esc to close; replay voices)
 - Hide / H / right-click: hide the text box; click to bring it back
-- Settings: text-box colour and opacity, skip delay
+- Settings: text-box colour and opacity, skip delay; with a second language, the main and the second subtitles
 - Esc: back to the index
 - Read marks and settings are stored in your browser
 

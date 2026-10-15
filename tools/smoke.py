@@ -5,7 +5,8 @@ story takes seconds instead of minutes. Reports stories that never reach their e
 commands that throw, page errors and assets the server can't deliver (HTTP 4xx/5xx).
 
 Usage: python tools/smoke.py [N|all] [seed] [--workers W] [--skip-delay MS] [--report out.json]
-  (needs tools/serve.py running; DANMEMO_URL overrides http://127.0.0.1:8080/)
+  (needs tools/serve.py running; DANMEMO_URL overrides http://127.0.0.1:8080/; SMOKE_STORAGE sets more
+  localStorage, e.g. '{"dm.subs": {"main": "en", "sub": "ja"}}' for two-language subtitles)
 """
 import argparse
 import collections
@@ -30,6 +31,9 @@ def run(job):
         b = p.chromium.launch(args=["--autoplay-policy=no-user-gesture-required", "--mute-audio"])
         ctx = b.new_context(viewport={"width": 1280, "height": 760})
         ctx.add_init_script(f"localStorage.setItem('dm.settings', JSON.stringify({{skipDelay: {skip_delay}}}))")
+        # SMOKE_STORAGE='{"dm.subs": {"main": "en", "sub": "ja"}}': more of the viewer's settings
+        for k, v in json.loads(os.environ.get("SMOKE_STORAGE") or "{}").items():
+            ctx.add_init_script(f"localStorage.setItem({json.dumps(k)}, {json.dumps(json.dumps(v))})")
         pg = ctx.new_page()
         cur = {"r": None}
 

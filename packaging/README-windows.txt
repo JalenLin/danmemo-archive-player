@@ -8,6 +8,7 @@ DanMemo Archive Player (Windows)
      或日版紀念版的 .xapk。
    - 備份資料夾：貼上解壓好的 App 資料備份所在路徑（裡面有 contents/1 … contents/8）。
      如果手上是 contents.part1.rar … part6.rar，先用 7-Zip 或 WinRAR 解壓。
+   - 選填：第二語言的備份資料夾（日版和國際版的備份各是一種語言），設定後播放器可以顯示雙字幕。
    - 按「開始建置」。不含下載約幾分鐘；可勾選從遊戲 CDN 補下載缺少的素材（約 1.6 GB，時間看網速）。
 3. 完成後按「開啟播放器」。之後再開 DanMemoPlayer.exe 會直接進播放器。關掉黑色視窗就結束。
 4. 要在 Android 手機上看：按設定頁的「打包給 Android App」，把 exe 旁邊產生的 DanMemo.dmpack
@@ -25,6 +26,8 @@ DanMemo Archive Player (Windows)
      or the JP memorial app's .xapk.
    - Backup folder: paste the path of the extracted app-data backup (it holds contents/1 ... contents/8).
      If you have contents.part1.rar ... part6.rar, extract them with 7-Zip or WinRAR first.
+   - Optional: a second-language backup (the JP and the global backups each hold one language) for
+     subtitles in two languages.
    - Click Build. It takes a few minutes, plus the optional download of what the backup lacks (~1.6 GB).
 3. Then click "Open the player". Next time DanMemoPlayer.exe opens the player directly. Close the log
    window to stop. Alternatively put the APK and the extracted backup in the "data" folder next to the exe.
@@ -41,6 +44,7 @@ Adding the work folder to Defender's exclusions (Windows Security > Virus & thre
 1. zip を展開して DanMemoPlayer.exe をダブルクリック。ログの画面とブラウザの設定ページが開きます。
 2. 設定ページで：APK（グローバル版 com.eu.danmemo_2023-12-22.apk、またはメモリアル版の .xapk）を選び、
    展開したアプリデータのバックアップのフォルダ（contents/1 … contents/8 があるもの）のパスを貼り付け、
+   （任意：もう一方の言語のバックアップを「第二言語のバックアップ」に指定すると二か国語字幕になります）
    「作成」を押します。作成は数分ほど（ダウンロードする場合はその時間が加わります）。
 3. 完了したら「プレイヤーを開く」。次回からはプレイヤーが直接開きます。ログの画面を閉じると終了します。
 4. Android で見るには：「Android アプリ用にまとめる」を押し、exe の隣にできた DanMemo.dmpack を端末の

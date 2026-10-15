@@ -72,7 +72,7 @@ async function route() {
     if (parts[0] === 'notices') return notices(parts[1]);
     if (parts[0] === 'credits') {
       view.innerHTML = `<div class="crumbs"><a href="#/">${t('ホーム')}</a></div><h1>${t('エンドクレジット')}</h1>
-        <video controls style="width:100%;max-height:75vh;background:#000;border-radius:10px" src="${(await getJSON('data/index.json')).ui?.credits || ''}"></video>`;
+        <video class="credits" controls style="width:min(100%, calc(75vh * 16 / 9));background:#000;border-radius:10px" src="${(await getJSON('data/index.json')).ui?.credits || ''}"></video>`;
       return;
     }
     view.innerHTML = `<p>${t('見つかりません')}</p>`;

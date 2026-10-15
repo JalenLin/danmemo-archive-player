@@ -21,14 +21,14 @@
   label { cursor: pointer; }
   pre { background: #070b16; border: 1px solid var(--line); border-radius: 8px; padding: 10px; height: 320px; overflow: auto; font-size: 12.5px; white-space: pre-wrap; margin: 0; }
   ul { margin: 6px 0; padding-left: 20px; }
-  #dumppath { min-width: 280px; }
+  #dumppath, #dump2path { min-width: 280px; }
   @media (max-width: 640px) {  /* phones (the Android app) */
     main { padding: 16px 12px 32px; }
     .row { flex-direction: column; gap: 2px; }
     .row b { min-width: 0; }
     .row > span { width: 100%; }
-    #dumppath { min-width: 0; flex: 1 1 100% !important; box-sizing: border-box; }
-    #dumpmsg { margin-left: 0 !important; }
+    #dumppath, #dump2path { min-width: 0; flex: 1 1 100% !important; box-sizing: border-box; }
+    #dumpmsg, #dump2msg { margin-left: 0 !important; }
     pre { height: 240px; }
   }
 </style>
@@ -47,6 +47,7 @@
     <div class="row"><b data-t="datafolder"></b><code id="data"></code></div>
     <div class="row"><b data-t="apk"></b><span id="apk"></span></div>
     <div class="row"><b data-t="dump"></b><span id="dump"></span></div>
+    <div class="row"><b data-t="dump2"></b><span id="dump2"></span></div>
     <div class="row"><b>ffmpeg</b><span id="ff"></span></div>
     <ul id="notes" class="bad"></ul>
   </div>
@@ -62,6 +63,15 @@
       </span></div>
     <div id="dumpmsg" class="muted" style="margin-left:9.6em"></div>
     <div class="muted" style="margin-top:6px" data-t="howdump"></div>
+    <div class="row" style="margin-top:14px"><b data-t="pickdump2"></b>
+      <span style="flex:1; display:flex; gap:8px; flex-wrap:wrap">
+        <input type="text" id="dump2path" style="flex:1; padding:6px 8px; background:#0e1428; color:var(--text); border:1px solid var(--line); border-radius:6px">
+        <button id="dump2pick" style="padding:6px 14px; display:none" data-t="pick"></button>
+        <button id="dump2ok" style="padding:6px 14px" data-t="check"></button>
+        <button id="dump2clear" style="padding:6px 14px" data-t="clear"></button>
+      </span></div>
+    <div id="dump2msg" class="muted" style="margin-left:9.6em"></div>
+    <div class="muted" style="margin-top:6px" data-t="howdump2"></div>
   </div>
 
   <div class="card">
@@ -91,7 +101,9 @@ const T = {
         howapp: 'Choose the folder of the extracted backup (contents, or a folder that holds it), or put it in the data folder above. Nothing is copied.',
         howdump: 'Paste the path of the extracted backup (e.g. D:\\danmemo\\contents, or the folder that holds it). Nothing is copied.',
         pack: 'Pack for the Android app', packed: 'For the Android app: copy {f} to the DanMemo folder of the phone\'s storage. The app then opens the player from it, with no setup on the phone. It holds your own game data: keep it to your own devices.',
-        packapp: 'Have a computer? Build there (much faster), choose “Pack for the Android app”, and copy the .dmpack file it makes into the data folder above: the app then plays from it, with nothing to set up here.' },
+        packapp: 'Have a computer? Build there (much faster), choose “Pack for the Android app”, and copy the .dmpack file it makes into the data folder above: the app then plays from it, with nothing to set up here.',
+        dump2: 'Second language', pickdump2: 'Second-language backup', unset: 'not set (optional)', clear: 'Clear',
+        howdump2: 'Optional: a backup in the other language (the JP and the global backups each have their own). Rebuild after choosing it, and the player can show subtitles in two languages. Only its stories are read; nothing is copied.' },
   zh: { intro: '用你自己的遊戲資料建置劇情播放器。所有資料都留在這台裝置上。',
         datafolder: '資料資料夾', apk: '金鑰來源', dump: 'App 資料備份', none: '找不到',
         download: '從遊戲 CDN 補下載備份缺少的素材（約 1.6 GB，主要是活動語音和少數圖片）',
@@ -103,7 +115,9 @@ const T = {
         howapp: '選擇解壓好的備份資料夾（contents 或包含它的資料夾），或直接放進上面的資料資料夾。不會複製檔案。',
         howdump: '貼上解壓後的備份所在路徑（例如 D:\\danmemo\\contents，或它的上一層資料夾）。不會複製檔案。',
         pack: '打包給 Android App', packed: 'Android App 用：把 {f} 複製到手機儲存空間的 DanMemo 資料夾，App 就會直接用它開啟播放器，手機上不用再建置。檔案裡是你自己的遊戲資料，請只用在自己的裝置上。',
-        packapp: '有電腦的話：在電腦上建置（快很多），按「打包給 Android App」，再把產生的 .dmpack 檔複製到上面的資料資料夾，App 就會直接用它播放，這裡不用再建置。' },
+        packapp: '有電腦的話：在電腦上建置（快很多），按「打包給 Android App」，再把產生的 .dmpack 檔複製到上面的資料資料夾，App 就會直接用它播放，這裡不用再建置。',
+        dump2: '第二語言', pickdump2: '第二語言的備份資料夾', unset: '未設定（選填）', clear: '清除',
+        howdump2: '選填：另一種語言的備份（日版和國際版的備份各是一種語言）。設定後重新建置，播放器就能顯示雙字幕。只會讀取其中的劇情文字，不會複製檔案。' },
   ja: { intro: '自分のゲームデータからシナリオプレイヤーを作成します。データはこの端末から外に出ません。',
         datafolder: 'データフォルダ', apk: '鍵の取得元', dump: 'アプリデータのバックアップ', none: '見つかりません',
         download: 'バックアップに足りない素材をゲームの CDN からダウンロード（約 1.6 GB、主にイベントボイス）',
@@ -115,7 +129,9 @@ const T = {
         howapp: '展開したバックアップのフォルダ（contents、またはそれを含むフォルダ）を選ぶか、上のデータフォルダに置いてください。ファイルはコピーしません。',
         howdump: '展開したバックアップのパスを貼り付けてください（例：D:\\danmemo\\contents、またはその上のフォルダ）。ファイルはコピーしません。',
         pack: 'Android アプリ用にまとめる', packed: 'Android アプリ用：{f} を端末ストレージの DanMemo フォルダにコピーしてください。アプリはそのファイルからプレイヤーを開くので、端末での作成は不要です。中身は自分のゲームデータなので、自分の端末だけで使ってください。',
-        packapp: 'パソコンがあれば：パソコンで作成し（ずっと速い）、「Android アプリ用にまとめる」で作った .dmpack ファイルを上のデータフォルダにコピーすれば、ここでの作成なしでそのまま再生できます。' },
+        packapp: 'パソコンがあれば：パソコンで作成し（ずっと速い）、「Android アプリ用にまとめる」で作った .dmpack ファイルを上のデータフォルダにコピーすれば、ここでの作成なしでそのまま再生できます。',
+        dump2: '第二言語', pickdump2: '第二言語のバックアップ', unset: '未設定（任意）', clear: '解除',
+        howdump2: '任意：もう一方の言語のバックアップ（日本版とグローバル版のバックアップはそれぞれ別の言語です）。設定して作り直すと、プレイヤーで二か国語の字幕を表示できます。読むのはストーリーの文章だけで、ファイルはコピーしません。' },
 };
 // the player's language setting (dm.lang, same origin), else the system language
 const pickLang = () => {
@@ -164,15 +180,19 @@ $('apkfile').onchange = () => {
 };
 // the Android app: the system folder picker instead of typing a path
 if (window.DanMemoApp) {
-  $('dumppick').style.display = '';
-  $('dumppick').onclick = () => window.DanMemoApp.pickFolder();
-  $('dumppath').readOnly = true;  // tapping the field opens the picker too; the pick is applied at once
-  $('dumppath').onclick = () => window.DanMemoApp.pickFolder();
-  $('dumpok').style.display = 'none';
+  let pickFor = 'dump';  // which field the system picker fills (the backup, or the second language's)
+  for (const f of ['dump', 'dump2']) {
+    const pick = () => { pickFor = f; window.DanMemoApp.pickFolder(); };
+    $(f + 'pick').style.display = '';
+    $(f + 'pick').onclick = pick;
+    $(f + 'path').readOnly = true;  // tapping the field opens the picker too; the pick is applied at once
+    $(f + 'path').onclick = pick;
+    $(f + 'ok').style.display = 'none';
+  }
   window.__appFolder = (path) => {
-    if (!path) { $('dumpmsg').innerHTML = `<span class="bad">${esc(L.none)}</span>`; return; }
-    $('dumppath').value = path;
-    $('dumpok').click();
+    if (!path) { $(pickFor + 'msg').innerHTML = `<span class="bad">${esc(L.none)}</span>`; return; }
+    $(pickFor + 'path').value = path;
+    $(pickFor + 'ok').click();
   };
 }
 $('dumpok').onclick = async () => {
@@ -180,12 +200,20 @@ $('dumpok').onclick = async () => {
   $('dumpmsg').innerHTML = r.ok ? `<span class="ok">✓ ${esc(r.folder)}</span>` : `<span class="bad">${esc(r.note)}</span>`;
   poll();
 };
+const setDump2 = async (path) => {
+  const r = await (await fetch('/setup/dump2', { method: 'POST', body: JSON.stringify({ path }) })).json();
+  $('dump2msg').innerHTML = r.folder ? `<span class="ok">✓ ${esc(r.folder)}</span>` : r.ok ? '' : `<span class="bad">${esc(r.note)}</span>`;
+  poll();
+};
+$('dump2ok').onclick = () => setDump2($('dump2path').value);
+$('dump2clear').onclick = () => { $('dump2path').value = ''; setDump2(''); };
 let lastLog = '';
 async function poll() {
   const s = await (await fetch('/setup/status')).json();
   $('data').textContent = s.data;
   $('apk').innerHTML = s.found.keysrc ? `<code>${esc(s.found.keysrc)}</code>` : `<span class="bad">${L.none}</span>`;
   $('dump').innerHTML = s.found.dump ? `<code>${esc(s.found.dump)}</code>` : `<span class="bad">${L.none}</span>`;
+  $('dump2').innerHTML = s.found.dump2 ? `<code>${esc(s.found.dump2)}</code>` : `<span class="muted">${L.unset}</span>`;
   $('ff').innerHTML = s.ffmpeg ? `<span class="ok">${L.ffok}</span>` : `<span class="muted">${L.ffno}</span>`;
   $('notes').innerHTML = s.found.notes.map((n) => `<li>${esc(n)}</li>`).join('');
   const ready = s.found.keysrc && s.found.dump;

@@ -111,6 +111,10 @@ def main(argv=None):
     files = player_files(web)
     found, missing = assets(cfg["asset_roots"], data)
     files.update(found)
+    usm = sorted(os.path.basename(n) for n in found if n.endswith(".usm"))
+    if usm:  # a build from before the movies were converted (v1.0.0), or without ffmpeg
+        print(f"Note: {len(usm)} cutscene movies aren't converted ({', '.join(usm[:3])}{', …' if len(usm) > 3 else ''}): "
+              "the player can't show .usm. Rebuild (with ffmpeg) to convert them, then pack again.", flush=True)
     size = {f: os.path.getsize(f) for f in files.values()}
     total = sum(size.values())
     print(f"{len(files)} files, {total / 1e9:.2f} GB" +

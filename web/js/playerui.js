@@ -27,6 +27,42 @@ function applyBox(rootEl, st) {
   rootEl.style.setProperty('--msg-name-bg', `rgba(${r},${g},${b},${Math.min(1, a + 0.25)})`);
 }
 
+// Subtitles in two languages: offered only when the build has another language's lines too (index.json
+// "texts"; tools/build_web.py with config "translations"). The choice is per viewer.
+const LANG_NAMES = { ja: '日本語', en: 'English', zh: '中文' };
+const langName = (l) => t(LANG_NAMES[l] || l);
+async function subtitles(getJSON, k) {
+  const tx = (await getJSON('data/index.json').catch(() => null))?.texts;
+  const langs = tx ? [tx.base, ...Object.keys(tx.langs || {})] : [];
+  if (langs.length < 2) return null;
+  const pick = store.get('dm.subs', {});
+  const main = langs.includes(pick.main) ? pick.main : tx.base;
+  const sub = langs.includes(pick.sub) && pick.sub !== main ? pick.sub : '';
+  const texts = {};
+  for (const l of [main, sub]) {
+    if (l && l !== tx.base) texts[l] = await getJSON(`data/text/${l}/${encodeURIComponent(k)}.json`).catch(() => null);
+  }
+  return { base: tx.base, langs, main, sub, texts };
+}
+// a story (or some of its lines) the chosen languages don't cover: say so, the lines show in the build's own.
+// The build's own language can lack lines too: the global client left the events it never ran in Japanese.
+const KANA = /[\u3040-\u30ff]/, WORDS = /[^\W_]/u;
+function subNotes(s, novel) {
+  if (!s) return [];
+  return [s.main, s.sub].filter(Boolean).map((l) => {
+    let d = s.texts[l];
+    if (l === s.base) {
+      if (l === 'ja') return '';
+      const said = novel.cmds.filter((c) => (c[0] === 11 || c[0] === 12 || c[0] === 45) && WORDS.test(c[7] || ''));
+      d = { n: said.length, lines: said.filter((c) => !KANA.test(c[7])) };
+    }
+    const have = d ? Object.keys(d.lines).length : 0;
+    if (d && !d.n) return '';
+    if (!have) return t('このシナリオには{l}の字幕がありません', { l: langName(l) });
+    return have < d.n ? t('一部のセリフには{l}の字幕がありません', { l: langName(l) }) : '';
+  }).filter(Boolean);
+}
+
 // LOG toggles: a second press (or Esc) closes the open log instead of stacking another one
 function showLog(rootEl, p, onClose) {
   const open = rootEl.querySelector('.logpane');
@@ -35,7 +71,7 @@ function showLog(rootEl, p, onClose) {
   pane._close = () => { pane.remove(); onClose && onClose(); };
   pane.className = 'logpane';
   pane.innerHTML = `<button class="vb" style="position:sticky;top:0;float:right;width:auto;padding:0 12px">${t('閉じる')}</button>` +
-    p.log.map((l, i) => `<div class="row"><div class="nm">${esc(l.name)}</div><div>${rubyHTML(l.text)}</div>${l.voice ? `<button class="vb" data-i="${i}">♪</button>` : '<span></span>'}</div>`).join('');
+    p.log.map((l, i) => `<div class="row"><div class="nm">${esc(l.name)}</div><div>${rubyHTML(l.text)}${l.sub ? `<div class="sub">${rubyHTML(l.sub)}</div>` : ''}</div>${l.voice ? `<button class="vb" data-i="${i}">♪</button>` : '<span></span>'}</div>`).join('');
   pane.addEventListener('click', (e) => {
     e.stopPropagation();
     const b = e.target.closest('button');
@@ -78,6 +114,7 @@ export function mountPlayer(container, key, opts) {
   const open = async (k) => {
     cleanup();
     const novel = await opts.getJSON(`data/novel/${encodeURIComponent(k)}.json`);
+    const subs = await subtitles(opts.getJSON, k);
     if (ctl.stopped) return;
     const settings = store.get('dm.settings', {});
     container.innerHTML = `<div class="player-wrap">
@@ -95,9 +132,15 @@ export function mountPlayer(container, key, opts) {
         <label>${t('SKIP 間隔')} <input type="range" min="30" max="500" step="10" data-box="skipDelay" value="${settings.skipDelay ?? SKIP_DELAY}"> <span data-skipv>${((settings.skipDelay ?? SKIP_DELAY) / 1000).toFixed(2)}</span> ${t('秒')}</label>
         <button data-box-reset>${t('デフォルト')}</button>${window.DanMemoApp?.setKeepScreenOn ? `
         <label>${t('画面を常にオン')} <select data-keep>${[['play', '再生中'], ['always', '常に'], ['off', 'しない']].map(([v, l]) =>
-          `<option value="${v}"${store.get('dm.keepScreen', 'play') === v ? ' selected' : ''}>${t(l)}</option>`).join('')}</select></label>` : ''}
+          `<option value="${v}"${store.get('dm.keepScreen', 'play') === v ? ' selected' : ''}>${t(l)}</option>`).join('')}</select></label>` : ''}${subs ? `
+        <label>${t('主字幕')} <select data-subs="main">${subs.langs.map((l) =>
+          `<option value="${l}"${l === subs.main ? ' selected' : ''}>${esc(langName(l))}</option>`).join('')}</select></label>
+        <label>${t('副字幕')} <select data-subs="sub"><option value="">${t('なし')}</option>${subs.langs.map((l) =>
+          `<option value="${l}"${l === subs.sub ? ' selected' : ''}>${esc(langName(l))}</option>`).join('')}</select></label>
+        <label>${t('テキストボックスの高さ')} <select data-subbox>${[['fit', 'セリフに合わせる'], ['fixed', '一定']].map(([v, l]) =>
+          `<option value="${v}"${(settings.subBox || 'fit') === v ? ' selected' : ''}>${t(l)}</option>`).join('')}</select></label>` : ''}
       </div>
-      <div class="player-root"></div>${gapNote(novel.gaps)}</div>`;
+      <div class="player-root"></div>${notesHTML([gapNote(novel.gaps), ...subNotes(subs, novel)])}</div>`;
     const rootEl = container.querySelector('.player-root');
     const note = container.querySelector('.gapnote');
     if (note) { note.onclick = () => note.remove(); setTimeout(() => note.remove(), 9000); }
@@ -126,7 +169,22 @@ export function mountPlayer(container, key, opts) {
       panel.querySelector('[data-skipv]').textContent = (BOX.skipDelay / 1000).toFixed(2);
       applyBox(rootEl, settings);
     };
-    const p = (ctl.player = window.__p = new Player(rootEl, { settings }));
+    const p = (ctl.player = window.__p = new Player(rootEl, { settings, subs }));
+    // a new subtitle choice applies from the next line on
+    panel.querySelectorAll('[data-subs]').forEach((sel) => (sel.onchange = async () => {
+      store.set('dm.subs', { ...store.get('dm.subs', {}), [sel.dataset.subs]: sel.value });
+      const s = await subtitles(opts.getJSON, k);
+      if (ctl.player === p) p.setSubs(s);
+      panel.querySelector('[data-subs=sub]').value = s.sub;  // the same language twice: no second line
+    }));
+    // with two languages: the text box follows each line's height, or keeps one height
+    rootEl.classList.toggle('fixedbox', settings.subBox === 'fixed');
+    const boxSel = panel.querySelector('[data-subbox]');
+    if (boxSel) boxSel.onchange = () => {
+      settings.subBox = boxSel.value;
+      store.set('dm.settings', { ...store.get('dm.settings', {}), subBox: boxSel.value });
+      rootEl.classList.toggle('fixedbox', boxSel.value === 'fixed');
+    };
     if (store.get('dm.auto', false)) { p.setAuto(true); bar.querySelector('[data-a=auto]').classList.add('on'); }
 
     // Hold left Ctrl to skip (like PC visual novels); the SKIP button stays a toggle.
@@ -246,7 +304,11 @@ export function gapList(g) {
 // a notice over the stage at the start of a story some of whose pictures / movies / portraits / effects are lost
 function gapNote(g) {
   if (!g || !['img', 'movie', 'chara', 'fx'].some((k) => g[k])) return '';
-  return `<div class="gapnote">${esc(t('このシナリオの素材の一部は、現存するどのデータにも含まれていないため表示されません：{list}', { list: gapList(g) }))}</div>`;
+  return t('このシナリオの素材の一部は、現存するどのデータにも含まれていないため表示されません：{list}', { list: gapList(g) });
+}
+function notesHTML(notes) {
+  notes = notes.filter(Boolean);
+  return notes.length ? `<div class="gapnote">${notes.map(esc).join('<br>')}</div>` : '';
 }
 
 /** Play in a full-screen popup over the current page; closing returns to it. */

@@ -87,20 +87,23 @@ export class Player {
         <div class="layer" data-l="still"></div>
         <div class="layer atext"></div>
         <div class="desc"><div class="desc-bg"></div><div class="desc-text"></div></div>
-        <div class="msg hidden"><div class="msg-name"></div><div class="msg-text"></div><div class="msg-next">▼</div></div>
+        <div class="msg hidden"><div class="msg-name"></div><div class="msg-text"></div><div class="msg-sub"></div><div class="msg-next">▼</div></div>
         <div class="titlecard hidden"><div class="tc-sub"></div><div class="tc-title"></div></div>
         <div class="choice hidden"></div>
         <div class="tint"></div>
         <div class="fade"></div>
         <video class="movie hidden" playsinline></video>
       </div>
+      <div class="stage-matte"></div>
       <svg width="0" height="0" style="position:absolute"><defs></defs></svg>`;
     this.stage = root.querySelector('.stage');
+    this.matte = root.querySelector('.stage-matte');
     this.L = {};
     root.querySelectorAll('.layer[data-l]').forEach((e) => (this.L[e.dataset.l] = e));
     this.msg = root.querySelector('.msg');
     this.msgName = root.querySelector('.msg-name');
     this.msgText = root.querySelector('.msg-text');
+    this.msgSub = root.querySelector('.msg-sub');
     this.desc = root.querySelector('.desc');
     this.descBg = root.querySelector('.desc-bg');
     this.descText = root.querySelector('.desc-text');
@@ -115,6 +118,7 @@ export class Player {
     this.skip = false;
     this.log = [];
     this.onLine = opts.onLine || (() => {});
+    this.setSubs(opts.subs || null);
     this._clickWaiters = [];
     this.stage.addEventListener('click', (e) => {
       if (e.target.closest('.choice')) return;
@@ -149,6 +153,12 @@ export class Player {
     const r = this.root.getBoundingClientRect();
     const s = Math.min(r.width / W, r.height / H) || 1;
     this.stage.style.transform = `translate(-50%,-50%) scale(${s})`;
+    // the matte isn't scaled (its own edges would blur too): placed on the stage's rectangle, on device pixels
+    const dpr = window.devicePixelRatio || 1, px = (v) => Math.round(v * dpr) / dpr;
+    const x0 = px((r.width - W * s) / 2), y0 = px((r.height - H * s) / 2);
+    Object.assign(this.matte.style, { left: `${x0}px`, top: `${y0}px`, width: `${px((r.width + W * s) / 2) - x0}px`,
+      height: `${px((r.height + H * s) / 2) - y0}px` });
+    this.matte.style.setProperty('--matte', `${3 / dpr}px`);
   }
 
   // ---------------------------------------------------------------- control
@@ -171,6 +181,38 @@ export class Player {
   }
   setAuto(v) { this.auto = v; if (v) this.click(); }
   setSkip(v) { this.skip = v; if (v) this.click(); }
+  // { base, main, sub, texts: { lang: { n, lines: { cmd index: { arg: text } } } } }; a second language on: .dual
+  setSubs(s) { this.subs = s; this.root.classList.toggle('dual', !!s?.sub); }
+  // two languages in a box of one height (.fixedbox): a line too long for it gets smaller type, the second
+  // language first (down to half the line's size), then the line itself (down to 70 %)
+  fitFixed() {
+    const sub = this.msgSub.style, main = this.msgText.style;
+    sub.fontSize = main.fontSize = '';
+    if (!this.root.classList.contains('dual') || !this.root.classList.contains('fixedbox')) return;
+    const fits = () => this.msg.scrollHeight <= this.msg.clientHeight + 1;
+    for (let k = 0.68; !fits() && k >= 0.5; k -= 0.02) sub.fontSize = `${k.toFixed(2)}em`;
+    for (let k = 0.97; !fits() && k >= 0.7; k -= 0.03) main.fontSize = `${k.toFixed(2)}em`;
+  }
+  // Subtitles: a command's args in `lang` (its text and name replaced), or null when that line isn't in it
+  textIn(lang, a, pc = this.pc) {
+    const s = this.subs;
+    if (!s || lang === s.base) return a;
+    const l = s.texts[lang]?.lines?.[pc];
+    if (!l) return null;
+    const b = a.slice();
+    for (const j in l) b[+j] = l[j];
+    return b;
+  }
+  // [the args shown (main language, else the build's own), the second language's or null]. The second line
+  // is left out when it would say the same (an untranslated line falling back to that language).
+  lines(op, a, pc = this.pc) {
+    const s = this.subs;
+    if (!s) return [a, null];
+    const m = this.textIn(s.main, a, pc) || a;
+    const x = s.sub ? this.textIn(s.sub, a, pc) : null;
+    const said = (c) => (op === 14 ? `${c[0]}\n${c[2]}` : c[6]);
+    return [m, x && said(x) !== said(m) ? x : null];
+  }
   d(sec) { return this.skip ? 0 : Math.max(0, sec) * 1000; }
   wait(sec) { const ms = this.d(sec); return ms ? sleep(ms) : Promise.resolve(); }
   bg(c, p) { Promise.resolve(p).catch((e) => console.warn('cmd failed', c, e)); }
@@ -269,14 +311,14 @@ export class Player {
       case 38: { const st = this.charState(a[0]); st.el.style.zIndex = String(1000 + Math.round(num(a[1]))); return; }  // CharacterZOrder
       case 49: return this.charRotate(a[0], num(a[1]), num(a[2]));  // CharacterRotate [portrait, degrees, s]
 
-      case 11: return this.talk(a, true);
-      case 12: return this.talk(a, false);
-      case 14: return this.selection(a);
+      case 11: return this.talk(...this.lines(t, a), true);
+      case 12: return this.talk(...this.lines(t, a), false);
+      case 14: return this.selection(...this.lines(t, a));
       // TalkClose doesn't block: in the original the astrea title (4) starts 1 s (the following 15) into
       // a '29 3.0' narration fade — timed by the logo against the effect's 475 frames
       case 29: this.msg.classList.add('hidden'); return this.bg(c, this.narrClear(num(a[0], 0.3)));
       case 44: return this.descShow(a[0], num(a[1], 0.5), num(a[2], 0.5), a[3]);
-      case 45: return this.narrate(a);
+      case 45: return this.narrate(...this.lines(t, a));
       case 21: return this.titleShow(a[0], a[1]);
 
       case 15: return this.wait(num(a[0]));
@@ -519,16 +561,31 @@ export class Player {
   }
 
   // ---------------------------------------------------------------- text
-  typeInto(el, text, onDone) {
-    const u = units(text);
-    el.innerHTML = u.map((x) => `<span class="u">${x}</span>`).join('');
-    const spans = el.querySelectorAll('.u');
-    let i = 0;
+  // sub: the second-language line typed along with it, { el } or { cls } (a div of that class added to el), and
+  // { text }. It keeps pace in proportion, so both lines finish together however different their lengths.
+  typeInto(el, text, sub = null) {
+    const spansOf = (t) => units(t).map((x) => `<span class="u">${x}</span>`).join('');
+    el.innerHTML = spansOf(text);
+    const spans = el.querySelectorAll(':scope > .u');
+    let subSpans = [];
+    if (sub) {
+      if (!sub.el) { el.insertAdjacentHTML('beforeend', `<div class="${sub.cls}"></div>`); sub.el = el.lastElementChild; }
+      sub.el.innerHTML = spansOf(sub.text);
+      subSpans = sub.el.querySelectorAll(':scope > .u');
+    }
+    let i = 0, j = 0;
     return new Promise((res) => {
       let tm = null;
-      const finish = () => { clearInterval(tm); spans.forEach((s) => s.classList.add('on')); this._typing = null; res(); };
-      if (this.skip || this.settings.textSpeed <= 0) { finish(); return; }
-      tm = setInterval(() => { if (i >= spans.length) return finish(); spans[i++].classList.add('on'); }, this.settings.textSpeed);
+      const finish = () => {
+        clearInterval(tm); spans.forEach((s) => s.classList.add('on')); subSpans.forEach((s) => s.classList.add('on'));
+        this._typing = null; res();
+      };
+      if (this.skip || this.settings.textSpeed <= 0 || !spans.length) { finish(); return; }
+      tm = setInterval(() => {
+        if (i >= spans.length) return finish();
+        spans[i++].classList.add('on');
+        for (const n = Math.round(subSpans.length * i / spans.length); j < n; j++) subSpans[j].classList.add('on');
+      }, this.settings.textSpeed);
       this._typing = { finish };
     });
   }
@@ -542,7 +599,7 @@ export class Player {
     v.play().catch(() => {});
     this.voice = v;
   }
-  async talk(a, waitTap) {
+  async talk(a, sub, waitTap) {
     const [portrait, face, vis, , voice, name, text] = a;
     const isP = portrait && portrait.startsWith('novel_portrait');
     // a[2] blank: the speaker is brought on screen if not there yet. 'off' (19,527 lines with a portrait):
@@ -563,15 +620,22 @@ export class Player {
     this.msgName.textContent = name || '';
     this.msg.classList.remove('ready');
     this.playVoice(voice);
-    const entry = { name: name || '', text: text || '', voice: voice && this.res(voice) };
+    const subText = sub?.[6] || '';
+    const entry = { name: name || '', text: text || '', sub: subText, voice: voice && this.res(voice) };
     this.log.push(entry);
     this.onLine(entry);
-    await this.typeInto(this.msgText, text || '');
+    // the second language under the line, typed along with it
+    this.msg.classList.toggle('has-sub', !!subText);
+    this.msgSub.innerHTML = '';
+    // trailing line breaks / spaces (some lines end in "\r\n　") would make an empty row the box grows for
+    const typing = this.typeInto(this.msgText, (text || '').trimEnd(), subText ? { el: this.msgSub, text: subText.trimEnd() } : null);
+    this.fitFixed();  // the text is laid out (hidden) by now
+    await typing;
     if (waitTap) { this.msg.classList.add('ready'); await this.waitClick(); }
   }
   // Selection: [textA, lenA, textB, lenB, voices, name]. The next lenA commands are branch A, the lenB after
   // them branch B (checked: B's text lands at +lenA in 451/491 choices); only the picked branch plays.
-  async selection(a) {
+  async selection(a, sub) {
     const [ta, , tb, , voices, name] = a;
     const lenA = Math.max(0, Math.round(num(a[1]))), lenB = Math.max(0, Math.round(num(a[3])));
     const vs = (voices || '').split(/\s+/).filter(Boolean);
@@ -584,7 +648,8 @@ export class Player {
         [ta, tb].forEach((t, i) => {
           if (!t) return;
           const b = document.createElement('button');
-          b.innerHTML = rubyHTML(t);
+          const st = sub && (i ? sub[2] : sub[0]);
+          b.innerHTML = rubyHTML(t) + (st ? `<div class="choice-sub">${rubyHTML(st)}</div>` : '');
           b.onclick = (e) => { e.stopPropagation(); res(i); };
           this.choiceEl.appendChild(b);
         });
@@ -597,10 +662,12 @@ export class Player {
     if (pick) this.pc += lenA;  // the loop's pc++ then lands on branch B
     else if (lenB) this.jumps.push({ at: this.pc + 1 + lenA, n: lenB });
     // about half the unvoiced branches open by repeating the choice; don't say it twice
-    const first = cmds.slice(start, start + (pick ? lenB : lenA)).find((c) => c[0] === 11 || c[0] === 12 || c[0] === 45);
+    const fi = cmds.slice(start, start + (pick ? lenB : lenA)).findIndex((c) => c[0] === 11 || c[0] === 12 || c[0] === 45);
+    const first = fi >= 0 ? cmds[start + fi] : null;
     const plain = (t) => String(t || '').replace(/\[r=[^\]]*\]|\[\/r\]|\s/g, '');
-    if (first && plain(first[first.length - 1]) === plain(text)) return;
-    return this.talk(['', '', '', 'middle', voiceKey, name, text], true);
+    if (first && plain(this.lines(first[0], first.slice(1), start + fi)[0]?.[6] ?? first[first.length - 1]) === plain(text)) return;
+    const subText = sub && (pick ? sub[2] : sub[0]);
+    return this.talk(['', '', '', 'middle', voiceKey, name, text], subText ? [, , , , , , subText] : null, true);
   }
   // Screen-wide overlays (50 tint, 44 narration backdrop) go right above the layer they name:
   // background = bg + middle images, middle = up to the characters, foreground, effect. Narration text,
@@ -649,7 +716,7 @@ export class Player {
     if (!this.descText.innerHTML) return lift;
     await Promise.all([lift, this.fadeTo(this.descText, [{ opacity: 1 }, { opacity: 0 }], sec, () => { this.descText.innerHTML = ''; this.descText.style.opacity = ''; })]);
   }
-  async narrate(a) {
+  async narrate(a, sub) {
     const [color, , pos, , voice, size, text] = a;
     this.msg.classList.add('hidden');
     this.fadeStop(this.descText); this.descText.style.opacity = '';  // a 29 still fading the previous text
@@ -657,10 +724,11 @@ export class Player {
     this.descText.style.fontSize = num(size, 30) + 'px';
     this.descText.dataset.pos = pos || 'middle';
     this.playVoice(voice);
-    const entry = { name: '', text: text || '', voice: voice && this.res(voice) };
+    const subText = sub?.[6] || '';
+    const entry = { name: '', text: text || '', sub: subText, voice: voice && this.res(voice) };
     this.log.push(entry);
     this.onLine(entry);
-    await this.typeInto(this.descText, text || '');
+    await this.typeInto(this.descText, (text || '').trimEnd(), subText ? { cls: 'desc-sub', text: subText.trimEnd() } : null);
     await this.waitClick();
   }
   async titleShow(title, sub) {

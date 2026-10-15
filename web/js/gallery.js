@@ -221,35 +221,56 @@ function cardSide(c, statNames, lb, su) {
 
 // lwf.js takes only http(s) or "/" URLs in imageMap and loads them itself with new Image(), so a texture
 // prepared on a canvas is handed over by redirecting that image's src to a blob URL.
-const imgRedirect = new Map();
-(() => {
-  const d = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
-  Object.defineProperty(HTMLImageElement.prototype, 'src', {
-    configurable: true, enumerable: d.enumerable, get() { return d.get.call(this); },
-    set(v) { const u = String(v); for (const [k, blob] of imgRedirect) if (u.endsWith(k)) { v = blob; break; } d.set.call(this, v); },
-  });
-})();
+const imgRedirect = new Map(), redirected = new Map();  // url -> blob url; url -> the image lwf loaded it into
+const setSrc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+Object.defineProperty(HTMLImageElement.prototype, 'src', {
+  configurable: true, enumerable: setSrc.enumerable, get() { return setSrc.get.call(this); },
+  set(v) {
+    const u = String(v);
+    for (const [k, blob] of imgRedirect) if (u.endsWith(k)) { v = blob; redirected.set(k, this); break; }
+    setSrc.set.call(this, v);
+  },
+});
 // The ★4 close-up (cut_06) shows the two crops stacked in lottery_upcut.png in the opposite order to the
 // original game (legs first, then chest — checked frame by frame against a recording; the Unity client
-// counts texture v from the bottom). Swapping the halves gives the original order and framing.
-const swapped = new Map();
-function swapHalves(url) {
-  if (!swapped.has(url)) {
-    swapped.set(url, new Promise((res) => {
+// counts texture v from the bottom), so the halves are swapped. The cut pans over each half with a view
+// ~500 rows tall that starts up to 20 rows past the middle, which showed a band of the OTHER crop (a stray
+// strip of legs over the chest). Each half therefore gets its own texture, the rows across the middle
+// mirroring its own edge; the second replaces the first when the cut moves on (UPCUT_SWITCH, under its flash).
+const UPCUT_SWITCH = 43;  // the cut's frame where the view jumps from the first half to the second
+const upcuts = new Map();  // key -> Promise<[first blob url, second blob url]>
+// key: the URL lwf is given for this cut only (url#cut06), so the card art itself (cut_07, cards without an
+// upcut) is never redirected
+function upcutTextures(url, key) {
+  if (!upcuts.has(key)) {
+    upcuts.set(key, new Promise((res) => {
       const im = new Image();
       im.onload = () => {
-        const c = document.createElement('canvas'), h = im.height / 2;
-        c.width = im.width; c.height = im.height;
-        const g = c.getContext('2d');
-        g.drawImage(im, 0, h, im.width, h, 0, 0, im.width, h);
-        g.drawImage(im, 0, 0, im.width, h, 0, h, im.width, h);
-        c.toBlob((b) => { if (b) imgRedirect.set(url, URL.createObjectURL(b)); res(); });
+        const W = im.width, h = im.height / 2, m = Math.round(h / 8);  // m: mirrored rows past the middle
+        const make = (first) => new Promise((done) => {
+          const c = document.createElement('canvas');
+          c.width = W; c.height = im.height;
+          const g = c.getContext('2d');
+          g.drawImage(im, 0, h, W, h, 0, 0, W, h);  // swapped: legs (the bottom crop) on top
+          g.drawImage(im, 0, 0, W, h, 0, h, W, h);
+          g.save();
+          if (first) {  // below the middle: the top crop's last rows, mirrored
+            g.translate(0, 2 * h); g.scale(1, -1);
+            g.drawImage(im, 0, im.height - m, W, m, 0, h - m, W, m);
+          } else {  // above the middle: the bottom crop's first rows, mirrored
+            g.translate(0, 2 * h); g.scale(1, -1);
+            g.drawImage(im, 0, 0, W, m, 0, h, W, m);
+          }
+          g.restore();
+          c.toBlob((b) => done(b ? URL.createObjectURL(b) : null));
+        });
+        Promise.all([make(true), make(false)]).then(([a, b]) => { if (a) imgRedirect.set(key, a); res([a, b]); });
       };
-      im.onerror = () => res();
+      im.onerror = () => res([null, null]);
       im.src = url;
     }));
   }
-  return swapped.get(url);
+  return upcuts.get(key);
 }
 
 // Drive a gacha-cut LWF (files/lwf/uiLwf/lottery/<name>). lwf.js renders into a fixed 1280x720 off-DOM
@@ -257,7 +278,7 @@ function swapHalves(url) {
 // `getRect()` -> {w,h} in CSS px. `map` values must be absolute URLs ("/..."); lwf glues its own prefix
 // onto anything else. `scale` shrinks the root (these cuts are authored ~1.6x the 1280x720 stage, so at
 // scale 1 the composition overflows and only the centre shows). `onEnd` fires at the last frame.
-function lwfCut(canvas, name, map, getRect, onEnd, scale = 1) {
+function lwfCut(canvas, name, map, getRect, onEnd, scale = 1, onFrame = null) {
   const dir = (GMETA.gachaCuts || {})[name] || `r/0/files/lwf/uiLwf/lottery/${name}/`;
   const buf = document.createElement('canvas');
   buf.width = 1280; buf.height = 720;
@@ -291,7 +312,9 @@ function lwfCut(canvas, name, map, getRect, onEnd, scale = 1) {
       const step = (now) => {
         if (!alive) return;
         if (!ended) {
-          l.exec((now - t0) / 1000); t0 = now; l.render();
+          l.exec((now - t0) / 1000); t0 = now;
+          if (onFrame) onFrame(l.rootMovie.currentFrame);
+          l.render();
           if (total && l.rootMovie.currentFrame >= total - 1) { ended = true; onEnd && onEnd(l); }
         }
         blit();
@@ -321,7 +344,7 @@ function gachaShow(c, opKind) {
   cv.style.display = 'none';
   let voice = null, cut = null;
   const getRect = () => { const k = Math.min(pop.clientWidth / 1280, pop.clientHeight / 720); return { w: 1280 * k, h: 720 * k }; };
-  const fit = () => { const r = getRect(); cv.style.width = r.w + 'px'; cv.style.height = r.h + 'px'; };
+  const fit = () => { const r = getRect(); cv.style.width = video.style.width = r.w + 'px'; cv.style.height = video.style.height = r.h + 'px'; };
   fit(); const ro = new ResizeObserver(fit); ro.observe(pop);
   const close = () => {
     video.pause(); if (voice) voice.pause(); if (music) music.pause(); if (cut) cut.stop();
@@ -345,8 +368,16 @@ function gachaShow(c, opKind) {
   if (g.text) phases.push({ cut: 'argo_gacha_cut_04_moji_3', map: { 'lwf_replace_txt_cut04.png': abs(g.text) }, scale: 0.6, voice: true });
   // ★4 close-up: get2 starts here (its quiet 2.6 s intro, then the fanfare runs on under cut_07)
   const upcut = rar === 4 && (GMETA.gachaCuts || {}).argo_gacha_cut_06_4 && (g.upcut || g.art);
-  if (upcut) phases.push({ cut: 'argo_gacha_cut_06_4', map: { 'lwf_replace_chara_cut06.png': abs(upcut) }, scale: 0.6, voice: true, music: fan.get2,
-    ready: swapHalves(abs(upcut)) });
+  if (upcut) {
+    const key = abs(upcut) + '#cut06', tex = upcutTextures(abs(upcut), key);
+    // scale 0.65, not 0.6: the view then stays inside each half all the way (at 0.6 it starts past the middle
+    // and ends past the texture's edge, a band of the cut's blue backdrop) — measured with a row-coded texture
+    phases.push({ cut: 'argo_gacha_cut_06_4', map: { 'lwf_replace_chara_cut06.png': key }, scale: 0.65, voice: true, music: fan.get2,
+      ready: tex, onFrame: (f) => tex.then((t) => {  // each half's texture (again from the first on a replay)
+        const want = t[f >= UPCUT_SWITCH ? 1 : 0], img = redirected.get(key);
+        if (want && img && setSrc.get.call(img) !== want) setSrc.set.call(img, want);
+      }) });
+  }
   const revealMusic = rar === 4 ? (upcut ? null : fan.get3) : rar === 3 ? fan.get1 : rar === 2 ? se.cha : null;
   phases.push({ cut: `argo_gacha_cut_07_${rar}`, music: revealMusic, map: {
     'lwf_replace_chara_cut07.png': art,
@@ -371,7 +402,7 @@ function gachaShow(c, opKind) {
     } else {
       video.pause(); video.classList.add('hidden'); cv.style.display = '';
       if (cut) cut.stop();
-      const start = () => { if (idx === i) cut = lwfCut(cv, ph.cut, ph.map, getRect, ph.last ? null : () => run(i + 1), ph.scale); };
+      const start = () => { if (idx === i) cut = lwfCut(cv, ph.cut, ph.map, getRect, ph.last ? null : () => run(i + 1), ph.scale, ph.onFrame); };
       if (ph.ready) ph.ready.then(start); else start();
     }
   };
