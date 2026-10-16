@@ -30,6 +30,8 @@ Game images shown are copyright of their respective owners. No game data comes w
 
 Download `DanMemoPlayer-windows.zip` from [Releases](https://github.com/JalenLin/danmemo-archive-player/releases), unzip it and run `DanMemoPlayer.exe`. On the page that opens, choose the global APK (or the JP memorial app's `.xapk`), paste the folder of your extracted app-data backup and click Build. See `README.txt` in the zip. The rest of this file describes building from source.
 
+A pack (`.dmpack`, see the Android app below) plays on a computer as well, e.g. one without the backup: drop it on `DanMemoPlayer.exe`, or put it next to the exe (where nothing is built yet), and the player opens with nothing to build. From source: `python tools/launcher.py DanMemo.dmpack`.
+
 ## Android app
 
 Download `DanMemoPlayer-android.apk` from [Releases](https://github.com/JalenLin/danmemo-archive-player/releases) and install it. It needs Android 7.0 or later on a 64-bit phone.
@@ -51,6 +53,7 @@ Notes:
 - The app looks for packs when it starts. If it was open while you copied, close it fully and open it again.
 - App updates bring the new player code without a new pack. Pack again only after rebuilding on the computer (e.g. after downloading missing assets).
 - With a pack in place, the app doesn't use a build on the phone. To build on the phone instead, move the pack out of the `DanMemo` folder.
+- With several packs there, the app plays the newest one (the one copied last).
 
 To build on the phone, without a computer:
 
@@ -302,8 +305,9 @@ tools/usm.py             CRI USM → MP4
 tools/gachanames.py      gacha name plates (called by build_web.py)
 tools/serve.py           local server with HTTP Range support
 tools/launcher.py        the Windows app's launcher: setup page in the browser, writes the config, runs the build, serves the player (packaging/ holds the build spec)
-android/                 the Android app: Chaquopy runs launcher.py in-process, a full-screen WebView shows the setup page and the player; with a pack it serves the player straight from it (pack_serve.py)
+android/                 the Android app: Chaquopy runs launcher.py in-process, a full-screen WebView shows the setup page and the player; with a pack it serves the player straight from it (tools/pack_serve.py)
 tools/dmpack.py          packs the player built on a computer and the assets it uses into one .dmpack for the Android app
+tools/pack_serve.py      serves the player straight from a .dmpack (the Android app and launcher.py on a computer)
 web/js/i18n.js           interface strings (Japanese keys → English / Chinese) and date formats
 tools/smoke.py           player test: plays stories in skip mode and reports hangs, command errors and failed asset loads (`smoke.py all --workers 10` for every story; Playwright; set DANMEMO_URL)
 tools/vidcompare.py      compare with a recording of the original game: screenshot every line, align with the video, list the lines that differ most (ffmpeg, Playwright)

@@ -12,6 +12,10 @@ A browser page shows what was found and builds everything into a `work` folder (
 data, the player's data); then the player opens. Nothing is uploaded anywhere: it is a local server.
 `--step NAME` runs one build step in a child process (used internally).
 
+A pack (tools/dmpack.py: the built player and its assets in one .dmpack file) plays as it is, with nothing to set
+up: give it on the command line (or drop it on DanMemoPlayer.exe), or put it next to the program or in `data`,
+where it is used while nothing is built in `work`. Of several packs, the newest is played.
+
 The Android app runs this too (android/): it sets DANMEMO_APP (where tools/ and web/ were unpacked),
 DANMEMO_HOME (for work/), DANMEMO_DATA (the data folder in shared storage) and DANMEMO_INPROCESS=1 (no child
 processes there: each step runs in this process, its output captured for the page).
@@ -41,6 +45,8 @@ CONFIG = os.path.join(WORK, "config.json")
 SETTINGS = os.path.join(WORK, "settings.json")  # what the user picked on the setup page
 KEYS = os.path.join(WORK, "keys.json")
 PACK = os.path.join(BASE, "DanMemo.dmpack")  # the built player for the Android app (tools/dmpack.py)
+PLAYING = None  # the pack the player is served from (main): one given, or one found while nothing is built
+GIVEN = False   # given on the command line: played even when there is a build
 TOOLS = os.path.join(APP, "tools")
 os.environ["DANMEMO_CONFIG"] = CONFIG  # for the tools imported here as well as the steps run in child processes
 os.environ["DANMEMO_KEYS"] = KEYS
@@ -354,6 +360,7 @@ JOB = Job()
 
 # ---------------------------------------------------------------- the local server
 def make_handler():
+    import pack_serve
     import serve
 
     class Handler(serve.Handler):
@@ -367,8 +374,11 @@ def make_handler():
                 found = detect()
                 body = {"found": {"keysrc": found["keysrc"], "dump": found["dump"], "dump2": found["dump2"], "notes": found["notes"]},
                         "data": DATA, "state": JOB.state, "step": JOB.step, "built": built(), "log": JOB.log[-200:],
-                        "ffmpeg": have_ffmpeg(), "pack": PACK if os.path.exists(PACK) else None}
+                        "ffmpeg": have_ffmpeg(), "pack": PACK if os.path.exists(PACK) else None,
+                        "playing": PLAYING if from_pack() else None}
                 return self._send(200, "application/json", json.dumps(body, ensure_ascii=False).encode())
+            if from_pack():
+                return pack_serve.send(self)
             if not built() and self.path in ("/", "/index.html"):
                 self.send_response(302); self.send_header("Location", "/setup"); self.end_headers()
                 return
@@ -376,6 +386,11 @@ def make_handler():
             if os.path.exists(CONFIG):
                 type(self).roots = json.load(open(CONFIG, encoding="utf-8"))["asset_roots"]
             return super().do_GET()
+
+        def do_HEAD(self):
+            if from_pack() and not self.path.startswith("/setup"):
+                return pack_serve.send(self, body=False)
+            return super().do_HEAD()
 
         def do_POST(self):
             n = int(self.headers.get("Content-Length") or 0)
@@ -432,6 +447,18 @@ def make_handler():
     return Handler
 
 
+def from_pack():
+    return bool(PLAYING) and (GIVEN or not built())
+
+
+def find_packs():
+    """packs on the command line (a .dmpack dropped on the program), else next to the program or in data/"""
+    given = [os.path.abspath(a) for a in sys.argv[1:] if a.lower().endswith(".dmpack") and os.path.isfile(a)]
+    if given:
+        return given, True
+    return glob.glob(os.path.join(BASE, "*.dmpack")) + glob.glob(os.path.join(DATA, "*.dmpack")), False
+
+
 def free_port(start=8080):
     for p in range(start, start + 50):
         with socket.socket() as s:
@@ -444,12 +471,18 @@ def main():
     multiprocessing.freeze_support()
     if "--step" in sys.argv:
         sys.exit(run_step(sys.argv[sys.argv.index("--step") + 1]) or 0)
+    global PLAYING, GIVEN
     os.makedirs(os.path.join(WORK, "web"), exist_ok=True)
     copy_player()
+    packs, GIVEN = find_packs()
+    if packs and (GIVEN or not built()):
+        import pack_serve
+        PLAYING = pack_serve.load(packs, os.path.join(APP, "web"))
     port = int(os.environ.get("DANMEMO_PORT") or free_port())
     srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler())
-    url = f"http://127.0.0.1:{port}/" + ("" if built() else "setup")
-    print(f"DanMemo Archive Player: {url}\n(data: {DATA}  work: {WORK})\nClose this window to stop.", flush=True)
+    url = f"http://127.0.0.1:{port}/" + ("" if built() or PLAYING else "setup")
+    print(f"DanMemo Archive Player: {url}\n(data: {DATA}  work: {WORK})" + (f"\nPlaying the pack {PLAYING}" if PLAYING else "")
+          + "\nClose this window to stop.", flush=True)
     if not os.environ.get("DANMEMO_NO_BROWSER"):
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:

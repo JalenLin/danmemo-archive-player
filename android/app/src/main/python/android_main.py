@@ -2,7 +2,7 @@
 and return its port. The app has unpacked tools/ and web/ into `app_dir` (a real folder: the launcher serves
 web/ from disk); `home` gets work/ (keys, decrypted data, the player's data); `data` is the folder in shared
 storage where the user puts the APK and the extracted backup — or a pack built on a computer (tools/dmpack.py),
-which is served as it is (pack_serve.py)."""
+which is served as it is (tools/pack_serve.py)."""
 import os
 import sys
 import threading
@@ -14,6 +14,9 @@ def start(app_dir, home, data, ffmpeg="", packs=""):
     warnings.simplefilter("ignore", ResourceWarning)
     warnings.simplefilter("ignore", DeprecationWarning)
     sys.__stdout__ = sys.stdout  # the launcher echoes its log there: logcat (python.stdout)
+    tools = os.path.join(app_dir, "tools")
+    if tools not in sys.path:
+        sys.path.insert(0, tools)
     if packs:  # the player built on a computer (*.dmpack): nothing to set up
         import pack_serve
         return pack_serve.start(packs.split("\n"), os.path.join(app_dir, "web"))
@@ -21,9 +24,6 @@ def start(app_dir, home, data, ffmpeg="", packs=""):
                       DANMEMO_INPROCESS="1", DANMEMO_NO_BROWSER="1")
     if ffmpeg and os.path.isfile(ffmpeg):  # the app's own ffmpeg (lib/<abi>/libffmpeg.so): the cutscene movies
         os.environ["DANMEMO_FFMPEG"] = ffmpeg
-    tools = os.path.join(app_dir, "tools")
-    if tools not in sys.path:
-        sys.path.insert(0, tools)
     import launcher
     port = launcher.free_port(18080)
     os.environ["DANMEMO_PORT"] = str(port)

@@ -83,6 +83,7 @@
       <span id="state" class="muted"></span>
     </div>
     <div id="packmsg" class="muted" style="margin-top:8px; display:none"></div>
+    <div id="playmsg" class="muted" style="margin-top:8px; display:none"></div>
   </div>
 
   <pre id="log"></pre>
@@ -100,6 +101,7 @@ const T = {
         noteapp: 'The build takes a few minutes (decryption about 5–10 on a phone), plus the download if chosen. It keeps going with the screen off or in the background, but newer Android versions slow it down a lot there: keep the screen on with this app in front for the fastest build.',
         howapp: 'Choose the folder of the extracted backup (contents, or a folder that holds it), or put it in the data folder above. Nothing is copied.',
         howdump: 'Paste the path of the extracted backup (e.g. D:\\danmemo\\contents, or the folder that holds it). Nothing is copied.',
+        playing: 'The player plays the pack {f}: nothing to build.',
         pack: 'Pack for the Android app', packed: 'For the Android app: copy {f} to the DanMemo folder of the phone\'s storage. The app then opens the player from it, with no setup on the phone. It holds your own game data: keep it to your own devices.',
         packapp: 'Have a computer? Build there (much faster), choose “Pack for the Android app”, and copy the .dmpack file it makes into the data folder above: the app then plays from it, with nothing to set up here.',
         dump2: 'Second language', pickdump2: 'Second-language backup', unset: 'not set (optional)', clear: 'Clear',
@@ -114,6 +116,7 @@ const T = {
         noteapp: '建置約需幾分鐘（手機上解密約 5〜10 分鐘），勾選補下載的話再加上下載時間。螢幕熄掉或切到背景時建置仍會繼續，但新版 Android 會讓它慢很多；想快一點的話，請讓螢幕亮著、這個 App 留在前景。',
         howapp: '選擇解壓好的備份資料夾（contents 或包含它的資料夾），或直接放進上面的資料資料夾。不會複製檔案。',
         howdump: '貼上解壓後的備份所在路徑（例如 D:\\danmemo\\contents，或它的上一層資料夾）。不會複製檔案。',
+        playing: '播放器正在用打包檔 {f} 播放，不用建置。',
         pack: '打包給 Android App', packed: 'Android App 用：把 {f} 複製到手機儲存空間的 DanMemo 資料夾，App 就會直接用它開啟播放器，手機上不用再建置。檔案裡是你自己的遊戲資料，請只用在自己的裝置上。',
         packapp: '有電腦的話：在電腦上建置（快很多），按「打包給 Android App」，再把產生的 .dmpack 檔複製到上面的資料資料夾，App 就會直接用它播放，這裡不用再建置。',
         dump2: '第二語言', pickdump2: '第二語言的備份資料夾', unset: '未設定（選填）', clear: '清除',
@@ -128,6 +131,7 @@ const T = {
         noteapp: '作成は数分ほど（端末での復号は 5〜10 分ほど）、ダウンロードする場合はその時間が加わります。画面オフやバックグラウンドでも作成は続きますが、新しい Android ではかなり遅くなります。早く終わらせたい場合は、画面をつけたままこのアプリを前面にしておいてください。',
         howapp: '展開したバックアップのフォルダ（contents、またはそれを含むフォルダ）を選ぶか、上のデータフォルダに置いてください。ファイルはコピーしません。',
         howdump: '展開したバックアップのパスを貼り付けてください（例：D:\\danmemo\\contents、またはその上のフォルダ）。ファイルはコピーしません。',
+        playing: 'まとめたファイル {f} で再生しています。作成は不要です。',
         pack: 'Android アプリ用にまとめる', packed: 'Android アプリ用：{f} を端末ストレージの DanMemo フォルダにコピーしてください。アプリはそのファイルからプレイヤーを開くので、端末での作成は不要です。中身は自分のゲームデータなので、自分の端末だけで使ってください。',
         packapp: 'パソコンがあれば：パソコンで作成し（ずっと速い）、「Android アプリ用にまとめる」で作った .dmpack ファイルを上のデータフォルダにコピーすれば、ここでの作成なしでそのまま再生できます。',
         dump2: '第二言語', pickdump2: '第二言語のバックアップ', unset: '未設定（任意）', clear: '解除',
@@ -219,7 +223,9 @@ async function poll() {
   const ready = s.found.keysrc && s.found.dump;
   $('go').textContent = s.built ? L.rebuild : L.build;
   $('go').disabled = !ready || s.state === 'running';
-  $('play').style.display = s.built && s.state !== 'running' ? '' : 'none';
+  $('play').style.display = (s.built || s.playing) && s.state !== 'running' ? '' : 'none';
+  $('playmsg').style.display = s.playing ? '' : 'none';
+  if (s.playing) $('playmsg').innerHTML = esc(L.playing).replace('{f}', `<code>${esc(s.playing)}</code>`);
   if (!window.DanMemoApp) {  // packing is for a computer's build
     $('pack').style.display = s.built ? '' : 'none';
     $('pack').disabled = s.state === 'running';

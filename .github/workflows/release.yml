@@ -48,6 +48,21 @@ jobs:
           (Invoke-WebRequest http://127.0.0.1:8099/setup -UseBasicParsing).StatusCode
           Stop-Process -Id $p.Id
 
+      - name: Smoke test (plays a pack given on the command line)
+        shell: pwsh
+        run: |
+          python -c "import json, zipfile; z = zipfile.ZipFile('test.dmpack', 'w'); z.writestr('data/index.json', json.dumps(dict(ok=1)), zipfile.ZIP_DEFLATED); z.writestr('r/0/a.ogg', bytes(range(256)) * 400); z.close()"
+          $env:DANMEMO_NO_BROWSER = "1"; $env:DANMEMO_PORT = "8098"
+          $p = Start-Process dist/DanMemoPlayer/DanMemoPlayer.exe -ArgumentList (Resolve-Path test.dmpack).Path -PassThru -WorkingDirectory dist/DanMemoPlayer
+          Start-Sleep -Seconds 8
+          $s = Invoke-RestMethod http://127.0.0.1:8098/setup/status
+          if (-not $s.playing) { throw "the pack is not played" }
+          if ((Invoke-RestMethod http://127.0.0.1:8098/data/index.json).ok -ne 1) { throw "data/index.json" }
+          $r = Invoke-WebRequest http://127.0.0.1:8098/r/0/a.ogg -Headers @{Range = "bytes=1000-1003"} -UseBasicParsing
+          if ($r.StatusCode -ne 206 -or (($r.Content | ForEach-Object { $_ }) -join ",") -ne "232,233,234,235") { throw "range read: $($r.StatusCode) $($r.Content)" }
+          Stop-Process -Id $p.Id
+          Remove-Item test.dmpack
+
       - name: Package
         shell: pwsh
         run: |

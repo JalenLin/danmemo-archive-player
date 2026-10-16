@@ -15,7 +15,7 @@ datas += [(os.path.join(ROOT, "LICENSE"), ".")]
 # the tools run from source at run time; listing them makes PyInstaller bundle their (standard library and
 # third-party) imports too: ssl for the CDN downloads, math, csv, …
 TOOL_MODULES = ["config", "keys", "dmcrypto", "fbdump", "decrypt_all", "build_web", "fill_gaps", "usm", "gachanames",
-                "serve", "cardstat", "dmpack"]
+                "serve", "cardstat", "dmpack", "pack_serve"]
 hidden = TOOL_MODULES + ["ssl", "math", "csv", "statistics", "email", "http.client"] + (collect_submodules("Crypto.Cipher") + collect_submodules("Crypto.Util") + collect_submodules("elftools")
           + ["numpy", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "PIL.ImageFilter", "PIL.PngImagePlugin",
              "PIL.JpegImagePlugin", "http.server", "concurrent.futures", "zipfile", "zlib", "tempfile", "runpy",

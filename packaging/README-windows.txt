@@ -15,6 +15,8 @@ DanMemo Archive Player (Windows)
    複製到手機內部儲存空間的 DanMemo 資料夾，再開 Android App 就會直接播放，手機上不用建置。
    打包檔裡是你自己的遊戲資料，請只用在自己的裝置上。打包會讀取約 20 萬個檔案，把 work 和備份資料夾
    都加入 Windows Defender 的排除項目會快很多。
+5. 打包檔在電腦上也能直接播放（例如在另一台沒有備份的電腦上看）：把 .dmpack 拖到 DanMemoPlayer.exe 上，
+   或放在 exe 旁邊（還沒建置過的話），開啟後就直接播放，不用建置。有好幾個打包檔時，用最新的一個。
 也可以不用設定頁：把 APK 和解壓好的備份放進 exe 旁邊的 data 資料夾，程式會自己找到。
 產生的金鑰、解密資料和播放器資料都在 work 資料夾，只留在這台電腦。不要分享 work 資料夾。
 建置會寫出上萬個小檔案，Windows Defender 逐一掃描會讓它慢很多；可以在「Windows 安全性 → 病毒與威脅防護 → 排除項目」加入 work 資料夾。
@@ -35,6 +37,9 @@ DanMemo Archive Player (Windows)
    exe into the DanMemo folder of the phone's internal storage. The app then plays from it, with no build on
    the phone. It holds your own game data: keep it to your own devices. Packing reads ~200,000 files: with
    both the work folder and the backup folder in Defender's exclusions it is much faster.
+5. A pack plays on a computer as well (e.g. one without the backup): drop the .dmpack on DanMemoPlayer.exe,
+   or put it next to the exe (where nothing is built yet), and the player opens with nothing to build. Of
+   several packs, the newest is played.
 Keys, decrypted data and the player's data are written to the "work" folder and stay on this computer.
 Don't share the work folder.
 The build writes tens of thousands of small files; Windows Defender scanning each one slows it down a lot.
@@ -51,6 +56,9 @@ Adding the work folder to Defender's exclusions (Windows Security > Virus & thre
    内部ストレージの DanMemo フォルダにコピーします。アプリがそこから直接再生するので、端末での作成は不要です。
    中身は自分のゲームデータなので、自分の端末だけで使ってください。約 20 万ファイルを読むので、work フォルダと
    バックアップのフォルダを Defender の除外に入れるとずっと速くなります。
+5. まとめたファイルはパソコンでもそのまま再生できます（バックアップのない別のパソコンなど）：.dmpack を
+   DanMemoPlayer.exe にドロップするか、exe の隣に置けば（まだ作成していない場合）、作成なしでプレイヤーが開きます。
+   複数ある場合は一番新しいものを使います。
 
 No game data or keys are included: you bring your own. Code: MIT License (LICENSE). Game content belongs to
 its owners. ffmpeg (_internal/ffmpeg) is a separate program under its own license (LICENSE.txt there).
